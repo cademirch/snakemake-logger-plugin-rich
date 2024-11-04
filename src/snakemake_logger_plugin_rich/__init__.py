@@ -1,6 +1,10 @@
 from snakemake_interface_logger_plugins.base import LoggerPluginBase
-from snakemake_logger_plugin_rich.handler import RichLogHandler
-from logging import Handler, Formatter
+from snakemake_logger_plugin_rich.handler import (
+    RichLogHandler,
+    RichFormatter,
+    RichFilter,
+)
+from logging import Handler
 
 
 class LoggerPlugin(LoggerPluginBase):
@@ -38,9 +42,11 @@ class LoggerPlugin(LoggerPluginBase):
             show_failed_logs=show_failed_logs,
             dryrun=dryrun,
             show_time=True,
-            show_path=False,
-            markup=False,
+            show_path=True,
+            markup=True,
         )
-        FORMAT = Formatter("%(message)s")
+        FORMAT = RichFormatter(printshellcmds=printshellcmds)
+        filterer = RichFilter()
         handler.setFormatter(FORMAT)
+        handler.addFilter(filterer)
         return handler

@@ -11,6 +11,7 @@ from rich.progress import (
 from rich.console import Console
 from typing import Optional
 from snakemake_interface_executor_plugins.settings import ExecMode
+from rich.text import Text
 
 
 class RichLogHandler(RichHandler):
@@ -33,7 +34,9 @@ class RichLogHandler(RichHandler):
         *args,
         **kwargs,
     ):
-        console = Console(stderr=not stdout)
+        console = Console(
+            stderr=not stdout,
+        )
         super().__init__(*args, **kwargs, console=console)
 
         # Store additional configurations
@@ -78,6 +81,32 @@ class RichLogHandler(RichHandler):
                 "Processing...", total=total_steps
             )
 
+    def get_level_text(self, record: logging.LogRecord) -> Text:
+        """Get the level name with a custom color style for the record.
+
+        Args:
+            record (logging.LogRecord): LogRecord instance.
+
+        Returns:
+            Text: Styled text for the level name.
+        """
+        level_name = record.levelname
+
+        # Define custom styles for specific "pseudo" levels
+        custom_styles = {
+            "JOB INFO": "dark_cyan",
+            "SHELL CMD": "green",
+            "HOST": "medium_purple",
+            "RESOURCES INFO": "royal_blue1",
+            "RUN INFO": "yellow3",
+            "INFO": "pale_green1",
+        }
+
+        # Apply custom style if it's a custom level, otherwise use default Rich style
+        style = custom_styles.get(level_name, f"logging.level.{level_name.lower()}")
+
+        # Return the level name styled with the selected color
+        return Text.styled(f"[{level_name}]".ljust(1), style=style)
     def get_level(self, record: logging.LogRecord) -> str:
         """
         Gets snakemake log level from a log record. If there is no snakemake log level,
@@ -107,7 +136,7 @@ class RichLogHandler(RichHandler):
         """
         Emit log messages with Rich formatting and update the progress bar if necessary.
         """
-        message = self.format(record)
+
         level = self.get_level(record)
 
         if level == "progress" and self.progress:
@@ -122,8 +151,7 @@ class RichLogHandler(RichHandler):
                 self.progress.start()
             # Update the progress bar
             self.progress.update(self.progress_task, completed=done_steps)
-        if level == "run_info":
-            record.message.replace("\n", "")
+
         else:
             super().emit(record)
 
@@ -137,3 +165,48 @@ class RichLogHandler(RichHandler):
                 self.progress.remove_task(self.progress_task)
                 self.progress_task = None
         super().close()
+
+class RichFormatter(logging.Formatter):
+    def __init__(self, printshellcmds: bool):
+        super().__init__()
+        self.printshellcmds = printshellcmds
+
+    def format(self, record):
+        # Format specific message types based on extra data
+        if hasattr(record, "level"):
+            record.levelname = record.level.upper().replace("_", " ")
+            if record.level == "job_info":
+                # Format job info as a single line
+
+                job_id = getattr(record, "jobid", "N/A")
+                rule_name = getattr(record, "rule_name", "N/A")
+                shell_cmd = getattr(record, "shellcmd")
+
+                if shell_cmd and self.printshellcmds:
+                    return f"Executing job: {job_id} | rule: {rule_name} | shell: {shell_cmd}"
+                else:
+                    return f"Executing job: {job_id} | rule: {rule_name}"
+
+        # Default format for other messages
+        return f"{record.getMessage()}"
+
+
+class RichFilter(logging.Filter):
+    def filter(self, record):
+        # Suppress repetitive "Select jobs to execute..." log entries
+        level = getattr(record, "level", False)
+
+        if level == "shellcmd":
+            return False
+        elif level == "progress":
+            return True
+        elif record.getMessage() == "Select jobs to execute...":
+            return False
+        elif record.getMessage().startswith("Execute"):
+            return False
+
+        # Suppress empty log entries
+        if not record.getMessage().strip():
+            return False
+
+        return True
