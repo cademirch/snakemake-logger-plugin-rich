@@ -9,6 +9,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 from rich.console import Console
+from rich.table import Table
 from typing import Optional
 from snakemake_interface_executor_plugins.settings import ExecMode
 from rich.text import Text
@@ -21,6 +22,7 @@ class RichLogHandler(RichHandler):
 
     def __init__(
         self,
+        console: Console,
         quiet=None,
         printshellcmds: Optional[bool] = None,
         printreason: Optional[bool] = None,
@@ -34,9 +36,7 @@ class RichLogHandler(RichHandler):
         *args,
         **kwargs,
     ):
-        console = Console(
-            stderr=not stdout,
-        )
+        self.console = console
         super().__init__(*args, **kwargs, console=console)
 
         # Store additional configurations
@@ -167,9 +167,10 @@ class RichLogHandler(RichHandler):
         super().close()
 
 class RichFormatter(logging.Formatter):
-    def __init__(self, printshellcmds: bool):
+    def __init__(self, console: Console, printshellcmds: bool):
         super().__init__()
         self.printshellcmds = printshellcmds
+        self.console = console
 
     def format(self, record):
         # Format specific message types based on extra data
@@ -186,6 +187,22 @@ class RichFormatter(logging.Formatter):
                     return f"Executing job: {job_id} | rule: {rule_name} | shell: {shell_cmd}"
                 else:
                     return f"Executing job: {job_id} | rule: {rule_name}"
+            elif record.level == "run_info":
+                stats = getattr(record, "stats", None)
+                if stats is not None:
+                    # Create a Rich table to display stats_dict
+                    table = Table(title="Job Stats")
+                    table.add_column("Job", justify="left")
+                    table.add_column("Count", justify="right")
+
+                    for job, count in stats.items():
+                        table.add_row(job, str(count))
+
+                    # Render the table as a string
+                    console = Console(width=150)
+                    with console.capture() as capture:
+                        console.print(table)
+                    return f"{Text.from_ansi(capture.get())}"
 
         # Default format for other messages
         return f"{record.getMessage()}"

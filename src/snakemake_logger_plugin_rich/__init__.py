@@ -4,6 +4,7 @@ from snakemake_logger_plugin_rich.handler import (
     RichFormatter,
     RichFilter,
 )
+from rich.console import Console
 from logging import Handler
 
 
@@ -27,10 +28,13 @@ class LoggerPlugin(LoggerPluginBase):
         dryrun: bool,
     ) -> Handler:
         """
-        Creates and returns an instance of RichLogHandler, configured with plugin settings.
+        Creates and returns an instance of RichLogHandler.
         """
-        # Initialize RichLogHandler with plugin settings
+        console = Console(
+            stderr=not stdout,
+        )
         handler = RichLogHandler(
+            console,
             quiet=quiet,
             printshellcmds=printshellcmds,
             printreason=printreason,
@@ -45,7 +49,7 @@ class LoggerPlugin(LoggerPluginBase):
             show_path=True,
             markup=True,
         )
-        FORMAT = RichFormatter(printshellcmds=printshellcmds)
+        FORMAT = RichFormatter(console, printshellcmds=printshellcmds)
         filterer = RichFilter()
         handler.setFormatter(FORMAT)
         handler.addFilter(filterer)
