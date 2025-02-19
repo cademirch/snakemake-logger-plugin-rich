@@ -10,7 +10,7 @@ from rich.progress import (
 )
 from rich.console import Console
 from rich.table import Table
-from snakemake_interface_logger_plugins.settings import LoggerSettingsInterface
+from snakemake_interface_logger_plugins.settings import OutputSettingsLoggerInterface
 from rich.text import Text
 
 
@@ -22,7 +22,7 @@ class RichLogHandler(RichHandler):
     def __init__(
         self,
         console: Console,
-        settings: LoggerSettingsInterface,
+        settings: OutputSettingsLoggerInterface,
         *args,
         **kwargs,
     ):
