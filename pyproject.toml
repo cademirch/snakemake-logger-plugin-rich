@@ -1,6 +1,6 @@
 [project]
 name = "snakemake-logger-plugin-rich"
-version = "0.2.1"
+version = "0.2.2"
 description = "Log plugin for snakemake using Rich"
 readme = "README.md"
 requires-python = "<4.0,>=3.11"
