@@ -1,9 +1,9 @@
+name: release-please
+
 on:
   push:
     branches:
       - master
-
-name: release-please
 
 jobs:
   release-please:
@@ -15,3 +15,49 @@ jobs:
         id: release
         with:
           release-type: python
+
+  setup_and_build:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install the project
+        run: uv sync --all-extras --dev
+
+      - name: Build source and wheel distribution
+        run: uv build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist/
+          
+  pypi_publish:
+    name: Upload release to PyPI
+    needs: setup_and_build
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    permissions:
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
