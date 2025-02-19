@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.2.0...v0.2.1) (2025-02-19)
+
+
+### Bug Fixes
+
+* update settings import ([5f46e6d](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/5f46e6de57251b59c69dd5014195b011665c92f8))
+
 ## [0.2.0](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.1.5...v0.2.0) (2025-02-19)
 
 
