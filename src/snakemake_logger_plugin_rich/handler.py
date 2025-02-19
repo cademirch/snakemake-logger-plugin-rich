@@ -10,8 +10,7 @@ from rich.progress import (
 )
 from rich.console import Console
 from rich.table import Table
-from typing import Optional
-from snakemake_interface_executor_plugins.settings import ExecMode
+from snakemake_interface_logger_plugins.settings import LoggerSettingsInterface
 from rich.text import Text
 
 
@@ -23,16 +22,7 @@ class RichLogHandler(RichHandler):
     def __init__(
         self,
         console: Console,
-        quiet=None,
-        printshellcmds: Optional[bool] = None,
-        printreason: Optional[bool] = None,
-        debug_dag: Optional[bool] = None,
-        nocolor: Optional[bool] = None,
-        stdout: Optional[bool] = None,
-        debug: Optional[bool] = None,
-        mode=None,
-        show_failed_logs: Optional[bool] = None,
-        dryrun: Optional[bool] = None,
+        settings: LoggerSettingsInterface,
         *args,
         **kwargs,
     ):
@@ -40,20 +30,17 @@ class RichLogHandler(RichHandler):
         super().__init__(*args, **kwargs, console=console)
 
         # Store additional configurations
-        self.quiet = quiet
-        self.printshellcmds = printshellcmds
-        self.printreason = printreason
-        self.debug_dag = debug_dag
-        self.nocolor = nocolor
-        self.stdout = stdout
-        self.debug = debug
-        self.mode = mode
-        self.show_failed_logs = show_failed_logs
-        self.dryrun = dryrun
-        self.stream = True
+        self.quiet = settings.quiet
+        self.printshellcmds = settings.printshellcmds
+        self.debug_dag = settings.debug_dag
+        self.nocolor = settings.nocolor
+        self.stdout = settings.stdout
+
+        self.show_failed_logs = settings.show_failed_logs
+        self.dryrun = settings.dryrun
 
         # Initialize the progress bar only if mode is not SUBPROCESS and not dryrun
-        if self.mode != ExecMode.SUBPROCESS and not self.dryrun:
+        if not self.dryrun:
             self.progress = Progress(
                 TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
                 BarColumn(),

@@ -1,4 +1,4 @@
-from snakemake_interface_logger_plugins.base import LoggerPluginBase
+from snakemake_interface_logger_plugins.base import LogHandlerBase
 from snakemake_logger_plugin_rich.handler import (
     RichLogHandler,
     RichFormatter,
@@ -8,49 +8,42 @@ from rich.console import Console
 from logging import Handler
 
 
-class LoggerPlugin(LoggerPluginBase):
-    def __post__init(self) -> None:
+class LoggerPlugin(LogHandlerBase, RichLogHandler):
+    def __post__init__(self) -> None:
         """
         Any additional setup after initialization.
         """
-
-    def create_handler(
-        self,
-        quiet,
-        printshellcmds: bool,
-        printreason: bool,
-        debug_dag: bool,
-        nocolor: bool,
-        stdout: bool,
-        debug: bool,
-        mode,
-        show_failed_logs: bool,
-        dryrun: bool,
-    ) -> Handler:
-        """
-        Creates and returns an instance of RichLogHandler.
-        """
         console = Console(
-            stderr=not stdout,
+            stderr=not self.common_settings.stdout,
         )
-        handler = RichLogHandler(
-            console,
-            quiet=quiet,
-            printshellcmds=printshellcmds,
-            printreason=printreason,
-            debug_dag=debug_dag,
-            nocolor=nocolor,
-            stdout=stdout,
-            debug=debug,
-            mode=mode,
-            show_failed_logs=show_failed_logs,
-            dryrun=dryrun,
-            show_time=True,
-            show_path=True,
-            markup=True,
-        )
-        FORMAT = RichFormatter(console, printshellcmds=printshellcmds)
-        filterer = RichFilter()
-        handler.setFormatter(FORMAT)
-        handler.addFilter(filterer)
-        return handler
+        RichLogHandler.__init__(self, console=console, settings=self.common_settings)
+        self.setFormatter(RichFormatter(console, self.common_settings.printshellcmds))
+        self.addFilter(RichFilter())
+
+    @property
+    def writes_to_stream(self) -> bool:
+        """
+        Whether this plugin writes to stderr/stdout
+        """
+        return True
+
+    @property
+    def writes_to_file(self) -> bool:
+        """
+        Whether this plugin writes to a file
+        """
+        return False
+
+    @property
+    def has_filter(self) -> bool:
+        """
+        Whether this plugin attaches its own filter
+        """
+        return True
+
+    @property
+    def has_formatter(self) -> bool:
+        """
+        Whether this plugin attaches its own formatter
+        """
+        return True
