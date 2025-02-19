@@ -3,7 +3,7 @@ name = "snakemake-logger-plugin-rich"
 version = "0.1.5"
 description = "Log plugin for snakemake using Rich"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = "<4.0,>=3.11"
 dependencies = [
     "rich>=13.9.4",
     "snakemake-interface-executor-plugins>=9.3.2",
