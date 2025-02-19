@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/0.1.1...v0.1.2) (2025-02-19)
+
+
+### Bug Fixes
+
+* :green_heart: add release-please ([8b3d39d](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/8b3d39d8828daa4c9045622c06847e1cd13294e5))
+* make work with newest interface ([c6f7377](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/c6f73773636ee591bc750872c838deaeaeba62f6))
+
 ## [0.1.1] - 2024-11-03
 
 - Added formatter and filter. 
