@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "rich>=13.9.4",
     "snakemake-interface-executor-plugins>=9.3.2",
-    "snakemake-interface-logger-plugins>=0.1.0",
+    "snakemake-interface-logger-plugins==0.3.0",
 ]
 
 [build-system]
