@@ -8,7 +8,7 @@ from rich.console import Console
 
 
 class LogHandler(LogHandlerBase, RichLogHandler):
-    def __post__init__(self) -> None:
+    def __post_init__(self) -> None:
         """
         Any additional setup after initialization.
         """
