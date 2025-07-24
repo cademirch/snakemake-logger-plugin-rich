@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.2.3...v0.2.4) (2025-07-24)
+
+
+### Bug Fixes
+
+* migrate to pixi, add demo ([159d012](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/159d0126cddaa088508f8054efcc3d3bad83ff40))
+
 ## [0.2.3](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.2.2...v0.2.3) (2025-03-10)
 
 
