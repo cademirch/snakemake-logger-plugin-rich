@@ -5,11 +5,40 @@ description = "Log plugin for snakemake using Rich"
 readme = "README.md"
 requires-python = "<4.0,>=3.11"
 dependencies = [
+    "pydantic>=2.10.6",
     "rich>=13.9.4",
     "snakemake-interface-executor-plugins>=9.3.2",
     "snakemake-interface-logger-plugins>=1.0.0",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.3.5", "snakemake>=9.0.1", "ruff>=0.9.10", ]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64"]
+
+[tool.pixi.environments]
+dev = { features = ["dev"] }
+
+[tool.pixi.pypi-dependencies]
+snakemake-logger-plugin-rich = { path = ".", editable = true }
+
+
+[tool.pixi.feature.dev.tasks.run-demo]
+    cmd = "snakemake -s {{ snakefile }} -d demo/output --logger rich --cores 1"
+    args = [{ "arg" = "snakefile", "default" = "demo/Snakefile" }]
+
+[tool.pixi.feature.dev.tasks.dryrun]
+    cmd = "snakemake -s {{ snakefile }} -d demo/output --logger rich -n"
+    args = [{ "arg" = "snakefile", "default" = "demo/Snakefile" }]
+
+[tool.pixi.feature.dev.tasks.clean-demo]
+    cmd = "rm -r demo/output"
+
+[tool.pixi.feature.dev.tasks]
+    demo = { depends-on = ["run-demo", "clean-demo"] }

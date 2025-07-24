@@ -1,8 +1,6 @@
 from snakemake_interface_logger_plugins.base import LogHandlerBase
 from snakemake_logger_plugin_rich.handler import (
     RichLogHandler,
-    RichFormatter,
-    RichFilter,
 )
 from rich.console import Console
 
@@ -16,8 +14,6 @@ class LogHandler(LogHandlerBase, RichLogHandler):
             stderr=not self.common_settings.stdout,
         )
         RichLogHandler.__init__(self, console=console, settings=self.common_settings)
-        self.setFormatter(RichFormatter(console, self.common_settings.printshellcmds))
-        self.addFilter(RichFilter())
 
     @property
     def writes_to_stream(self) -> bool:
@@ -46,3 +42,10 @@ class LogHandler(LogHandlerBase, RichLogHandler):
         Whether this plugin attaches its own formatter
         """
         return True
+
+    @property
+    def needs_rulegraph(self) -> bool:
+        """
+        Whether this plugin requires the DAG rulegraph.
+        """
+        return False

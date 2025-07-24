@@ -1,22 +1,39 @@
 import logging
+import re
+from typing import Dict, Type, Optional, List
 from rich.logging import RichHandler
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
-from rich.console import Console
+from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
+from rich.console import Console, RenderableType
+from rich.live import Live
+from rich.panel import Panel
 from rich.table import Table
-from snakemake_interface_logger_plugins.settings import OutputSettingsLoggerInterface
+from rich.layout import Layout
 from rich.text import Text
+from pydantic import BaseModel
+from snakemake_interface_logger_plugins.settings import OutputSettingsLoggerInterface
+from snakemake_interface_logger_plugins.common import LogEvent
 
+
+from snakemake_logger_plugin_rich.parsers import (
+    WorkflowStarted,
+    JobInfo,
+    JobStarted,
+    JobFinished,
+    ShellCmd,
+    JobError,
+    GroupInfo,
+    GroupError,
+    ResourcesInfo,
+    DebugDag,
+    Progress as ProgressModel,
+    RuleGraph,
+    RunInfo,
+)
 
 class RichLogHandler(RichHandler):
     """
-    A custom Rich handler for Snakemake logging with a persistent progress bar at the bottom.
+    A Snakemake logger that displays job information and
+    shows progress bars for rules.
     """
 
     def __init__(
@@ -26,191 +43,408 @@ class RichLogHandler(RichHandler):
         *args,
         **kwargs,
     ):
+        
+        kwargs["console"] = console
+        kwargs["show_path"] = True
+        kwargs["show_time"] = True
+        kwargs["omit_repeated_times"] = False
+        kwargs["rich_tracebacks"] = True
+        kwargs["tracebacks_width"] = 100
+        kwargs["tracebacks_show_locals"] = False
+        super().__init__(*args, **kwargs)
+
+        
         self.console = console
-        super().__init__(*args, **kwargs, console=console)
+        self.settings = settings
 
-        # Store additional configurations
-        self.quiet = settings.quiet
-        self.printshellcmds = settings.printshellcmds
-        self.debug_dag = settings.debug_dag
-        self.nocolor = settings.nocolor
-        self.stdout = settings.stdout
+        
+        self.jobs_info = {}  
 
-        self.show_failed_logs = settings.show_failed_logs
-        self.dryrun = settings.dryrun
+        
+        self.progress = Progress(
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(complete_style="green"),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=None,
+        )
 
-        # Initialize the progress bar only if mode is not SUBPROCESS and not dryrun
-        if not self.dryrun:
-            self.progress = Progress(
-                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TextColumn("•"),
-                TimeElapsedColumn(),
-                TextColumn("•"),
-                TimeRemainingColumn(),
-                console=console,
-                auto_refresh=True,
-            )
-            self.progress_task = None
-            self.total_steps = 1  # To avoid division errors if not set
-        else:
-            self.progress = None
-            self.progress_task = None
+        
+        self.rule_tasks = {}  
+        self.total_jobs = {}  
+        self.done_jobs = {}  
 
-    def start_progress_bar(self, total_steps):
-        """
-        Initialize and start the progress bar for a Snakemake job if progress is enabled.
-        """
-        if self.progress:
-            self.total_steps = total_steps
-            self.progress_task = self.progress.add_task(
-                "Processing...", total=total_steps
-            )
+        
+        self.log_messages: List[RenderableType] = []
+        self.max_log_messages = 15  
 
-    def get_level_text(self, record: logging.LogRecord) -> Text:
-        """Get the level name with a custom color style for the record.
+        
+        self.logs_panel = Panel(Text(""), title="Logs", border_style="blue")
+        self.progress_panel = Panel(
+            self.progress, title="Rule Progress", border_style="green"
+        )
 
-        Args:
-            record (logging.LogRecord): LogRecord instance.
+        self.layout = Layout()
+        self.layout.split_column(
+            Layout(self.logs_panel, name="logs", size=15),  
+            Layout(
+                self.progress_panel, name="progress", size=10
+            ),  
+        )
 
-        Returns:
-            Text: Styled text for the level name.
-        """
-        level_name = record.levelname
+        
+        self.live = Live(
+            self.layout,
+            console=console,
+            refresh_per_second=4,
+            auto_refresh=False,
+            vertical_overflow="crop",
+        )
+        self.live.start()
 
-        # Define custom styles for specific "pseudo" levels
-        custom_styles = {
-            "JOB INFO": "dark_cyan",
-            "SHELL CMD": "green",
-            "HOST": "medium_purple",
-            "RESOURCES INFO": "royal_blue1",
-            "RUN INFO": "yellow3",
-            "INFO": "pale_green1",
+        
+        self.parsers: Dict[LogEvent, Type[BaseModel]] = {
+            LogEvent.WORKFLOW_STARTED: WorkflowStarted,
+            LogEvent.JOB_INFO: JobInfo,
+            LogEvent.JOB_STARTED: JobStarted,
+            LogEvent.JOB_FINISHED: JobFinished,
+            LogEvent.JOB_ERROR: JobError,
+            LogEvent.SHELLCMD: ShellCmd,
+            LogEvent.GROUP_INFO: GroupInfo,
+            LogEvent.GROUP_ERROR: GroupError,
+            LogEvent.RESOURCES_INFO: ResourcesInfo,
+            LogEvent.DEBUG_DAG: DebugDag,
+            LogEvent.PROGRESS: ProgressModel,
+            LogEvent.RULEGRAPH: RuleGraph,
+            LogEvent.RUN_INFO: RunInfo,
         }
 
-        # Apply custom style if it's a custom level, otherwise use default Rich style
-        style = custom_styles.get(level_name, f"logging.level.{level_name.lower()}")
+    def get_event_type(self, record: logging.LogRecord) -> Optional[LogEvent]:
+        """Get event type from log record."""
+        if hasattr(record, "event") and isinstance(record.event, LogEvent):
+            return record.event
+        return None
 
-        # Return the level name styled with the selected color
-        return Text.styled(f"[{level_name}]".ljust(1), style=style)
-    def get_level(self, record: logging.LogRecord) -> str:
-        """
-        Gets snakemake log level from a log record. If there is no snakemake log level,
-        returns the log record's level name.
-
-        Args:
-            record (logging.LogRecord)
-        Returns:
-            str: The log level
-
-        """
-        level = record.__dict__.get("level", None)
-
-        if level is None:
-            level = record.levelname
-
-        return level.lower()
-
-    def update_progress(self, done_steps):
-        """
-        Update the progress bar with the number of completed steps.
-        """
-        if self.progress and self.progress_task is not None:
-            self.progress.update(self.progress_task, completed=done_steps)
-
-    def emit(self, record):
-        """
-        Emit log messages with Rich formatting and update the progress bar if necessary.
-        """
-
-        level = self.get_level(record)
-
-        if level == "progress" and self.progress:
-            done_steps = getattr(record, "done", 0)
-            total_steps = getattr(record, "total", self.total_steps)
-            if self.progress_task is None:
-                # Start progress bar if this is the first progress log
-                self.total_steps = total_steps
-                self.progress_task = self.progress.add_task(
-                    "Processing...", total=total_steps
-                )
-                self.progress.start()
-            # Update the progress bar
-            self.progress.update(self.progress_task, completed=done_steps)
-
-        else:
-            super().emit(record)
-
-    def close(self):
-        """
-        Ensure progress bar is stopped and cleaned up on handler close.
-        """
-        if self.progress:
-            self.progress.stop()
-            if self.progress_task is not None:
-                self.progress.remove_task(self.progress_task)
-                self.progress_task = None
-        super().close()
-
-class RichFormatter(logging.Formatter):
-    def __init__(self, console: Console, printshellcmds: bool):
-        super().__init__()
-        self.printshellcmds = printshellcmds
-        self.console = console
-
-    def format(self, record):
-        # Format specific message types based on extra data
-        if hasattr(record, "level"):
-            record.levelname = record.level.upper().replace("_", " ")
-            if record.level == "job_info":
-                # Format job info as a single line
-
-                job_id = getattr(record, "jobid", "N/A")
-                rule_name = getattr(record, "rule_name", "N/A")
-                shell_cmd = getattr(record, "shellcmd")
-
-                if shell_cmd and self.printshellcmds:
-                    return f"Executing job: {job_id} | rule: {rule_name} | shell: {shell_cmd}"
-                else:
-                    return f"Executing job: {job_id} | rule: {rule_name}"
-            elif record.level == "run_info":
-                stats = getattr(record, "stats", None)
-                if stats is not None:
-                    # Create a Rich table to display stats_dict
-                    table = Table(title="Job Stats")
-                    table.add_column("Job", justify="left")
-                    table.add_column("Count", justify="right")
-
-                    for job, count in stats.items():
-                        table.add_row(job, str(count))
-
-                    # Render the table as a string
-                    console = Console(width=150)
-                    with console.capture() as capture:
-                        console.print(table)
-                    return f"{Text.from_ansi(capture.get())}"
-
-        # Default format for other messages
-        return f"{record.getMessage()}"
-
-
-class RichFilter(logging.Filter):
-    def filter(self, record):
-        # Suppress repetitive "Select jobs to execute..." log entries
-        level = getattr(record, "level", False)
-
-        if level == "shellcmd":
+    def should_log_message(self, record, message):
+        """Determine if we should log this message based on content filtering."""
+        
+        if message == "None":
             return False
-        elif level == "progress":
+
+        
+        if record.levelno >= logging.ERROR:
             return True
-        elif record.getMessage() == "Select jobs to execute...":
-            return False
-        elif record.getMessage().startswith("Execute"):
-            return False
 
-        # Suppress empty log entries
-        if not record.getMessage().strip():
-            return False
+        
+        skip_patterns = [
+            "^Select jobs to execute",
+            "^Assuming unrestricted shared filesystem",
+        ]
+
+        for pattern in skip_patterns:
+            if re.search(pattern, message):
+                return False
 
         return True
+
+    def format_wildcards(self, wildcards):
+        """Format wildcards into a string representation."""
+        if not wildcards:
+            return ""
+
+        wildcards_str = ", ".join(f"{k}={v}" for k, v in wildcards.items())
+        return f" | wildcards: {wildcards_str}"
+
+    def truncate_message(self, message, max_length=100):
+        """Truncate message to fit within max_length characters."""
+        if len(message) <= max_length:
+            return message
+        return message[: max_length - 3] + "..."
+
+    def create_custom_message(self, record, event_type):
+        """Create custom formatted messages for specific event types."""
+        if event_type == LogEvent.JOB_INFO:
+            try:
+                
+                parser = self.parsers[event_type]
+                job_info = parser.from_record(record)
+
+                
+                self.jobs_info[job_info.jobid] = {
+                    "rule_name": job_info.rule_name,
+                    "wildcards": job_info.wildcards,
+                }
+
+                
+                wildcards_str = self.format_wildcards(job_info.wildcards)
+                message = f"Submitted job {job_info.jobid} | Rule: {job_info.rule_name}{wildcards_str}"
+
+                
+                return self.truncate_message(message)
+
+            except Exception as e:
+                return f"Error parsing job info: {str(e)}"
+
+        elif event_type == LogEvent.JOB_FINISHED:
+            try:
+                
+                parser = self.parsers[event_type]
+                job_finished = parser.from_record(record)
+
+                job_id = job_finished.job_id
+                if job_id in self.jobs_info:
+                    info = self.jobs_info[job_id]
+                    rule_name = info["rule_name"]
+                    wildcards_str = self.format_wildcards(info["wildcards"])
+                    message = (
+                        f"Finished job {job_id} | Rule: {rule_name}{wildcards_str}"
+                    )
+                else:
+                    message = f"Finished job {job_id}"
+
+                
+                return self.truncate_message(message)
+
+            except Exception as e:
+                return f"Error creating job finished message: {str(e)}"
+
+        elif event_type == LogEvent.SHELLCMD:
+            return
+
+        elif event_type == LogEvent.JOB_ERROR:
+            try:
+                
+                parser = self.parsers[event_type]
+                job_error = parser.from_record(record)
+
+                
+                return (
+                    f"[bold red]ERROR[/bold red] in job {job_error.jobid}: Job failed"
+                )
+
+            except Exception as e:
+                return f"Error parsing job error: {str(e)}"
+
+        elif event_type == LogEvent.RUN_INFO:
+            try:
+                
+                parser = self.parsers[event_type]
+                run_info = parser.from_record(record)
+
+                
+                return f"Workflow run info: {len(run_info.job_ids)} jobs"
+
+            except Exception as e:
+                return f"Error parsing run info: {str(e)}"
+
+        
+        return None
+
+    def add_to_log_display(self, message, style=None):
+        """Add a message to the log display panel."""
+        
+        if isinstance(message, str):
+            if style:
+                message = Text(message, style=style)
+            else:
+                message = Text(message)
+
+        
+        elif (
+            isinstance(message, dict) and "message" in message and "command" in message
+        ):
+            
+            self.log_messages.append(Text(message["message"]))
+            
+            cmd_text = Text("    " + message["command"], style="yellow")
+            self.log_messages.append(cmd_text)
+            
+            self.update_log_panel()
+            return
+
+        
+        self.log_messages.append(message)
+
+        
+        self.log_messages = self.log_messages[-self.max_log_messages :]
+
+        
+        self.update_log_panel()
+
+    def update_log_panel(self):
+        """Update the log panel with the current log messages."""
+        if not self.log_messages:
+            return
+
+        
+        log_text = Text("\n").join(self.log_messages)
+
+        
+        self.logs_panel.renderable = log_text
+
+        
+        self.live.refresh()
+
+    def emit(self, record):
+        """Process log records and update progress bars."""
+        try:
+            
+            event_type = self.get_event_type(record)
+
+            
+            message = self.format(record)
+
+            
+            if not self.should_log_message(record, message):
+                pass
+            else:
+                
+                if record.levelno >= logging.ERROR and not event_type:
+                    
+                    self.add_to_log_display(message, style="bold red")
+                
+                elif event_type:
+                    custom_message = self.create_custom_message(record, event_type)
+
+                    if custom_message is False:
+                        
+                        pass
+                    elif custom_message is not None:
+                        
+                        if isinstance(custom_message, str):
+                            
+                            self.add_to_log_display(custom_message)
+                        elif isinstance(custom_message, dict):
+                            
+                            self.add_to_log_display(custom_message)
+                        else:
+                            
+                            self.add_to_log_display(custom_message)
+                    else:
+                        
+                        self.add_to_log_display(message)
+                else:
+                    
+                    self.add_to_log_display(message)
+
+            
+            if event_type == LogEvent.RUN_INFO:
+                self.handle_run_info(record)
+            elif event_type == LogEvent.JOB_INFO:
+                self.handle_job_info(record)
+            elif event_type == LogEvent.JOB_FINISHED:
+                self.handle_job_finished(record)
+            elif event_type == LogEvent.JOB_ERROR:
+                self.handle_job_error(record)
+
+        except Exception as e:
+            
+            self.add_to_log_display(
+                f"Error in logging handler: {str(e)}", style="bold red"
+            )
+
+    def handle_run_info(self, record):
+        """Handle RUN_INFO events to set up progress bars."""
+        try:
+            parser = self.parsers[LogEvent.RUN_INFO]
+            run_info = parser.from_record(record)
+
+            
+            stats = run_info.stats
+            if stats:
+                for rule, count in stats.items():
+                    if rule != "total" and count > 0:
+                        if rule not in self.rule_tasks:
+                            task_id = self.progress.add_task(
+                                f"Rule: {rule}", total=count
+                            )
+                            self.rule_tasks[rule] = task_id
+                            self.total_jobs[rule] = count
+                            self.done_jobs[rule] = 0
+        except Exception as e:
+            self.add_to_log_display(
+                f"Error parsing run info: {str(e)}", style="bold red"
+            )
+
+    def handle_job_info(self, record):
+        """Handle JOB_INFO events for progress tracking."""
+        try:
+            parser = self.parsers[LogEvent.JOB_INFO]
+            job_info = parser.from_record(record)
+
+            
+            rule_name = job_info.rule_name
+            if rule_name not in self.rule_tasks:
+                task_id = self.progress.add_task(f"Rule: {rule_name}", total=1)
+                self.rule_tasks[rule_name] = task_id
+                self.total_jobs[rule_name] = 1
+                self.done_jobs[rule_name] = 0
+        except Exception as e:
+            self.add_to_log_display(
+                f"Error parsing job info: {str(e)}", style="bold red"
+            )
+
+    def handle_job_finished(self, record):
+        """Handle JOB_FINISHED events to update progress."""
+        try:
+            parser = self.parsers[LogEvent.JOB_FINISHED]
+            job_finished = parser.from_record(record)
+
+            
+            job_id = job_finished.job_id
+
+            if job_id in self.jobs_info:
+                rule_name = self.jobs_info[job_id]["rule_name"]
+
+                if rule_name in self.rule_tasks:
+                    self.done_jobs[rule_name] = self.done_jobs.get(rule_name, 0) + 1
+
+                    
+                    task_id = self.rule_tasks[rule_name]
+                    done = self.done_jobs[rule_name]
+                    total = self.total_jobs[rule_name]
+
+                    
+                    if done >= total:
+                        self.progress.update(
+                            task_id,
+                            completed=total,
+                            description=f"[green]✓[/green] Rule: {rule_name}",
+                        )
+                    else:
+                        self.progress.update(task_id, completed=done)
+        except Exception as e:
+            self.add_to_log_display(
+                f"Error parsing job finished: {str(e)}", style="bold red"
+            )
+
+    def handle_job_error(self, record):
+        """Handle JOB_ERROR events to update progress bars with error state."""
+        try:
+            parser = self.parsers[LogEvent.JOB_ERROR]
+            job_error = parser.from_record(record)
+
+            
+            job_id = job_error.jobid
+
+            
+            if job_id in self.jobs_info:
+                rule_name = self.jobs_info[job_id]["rule_name"]
+
+                if rule_name in self.rule_tasks:
+                    task_id = self.rule_tasks[rule_name]
+                    
+                    self.progress.update(
+                        task_id,
+                        description=f"[red]✗[/red] Rule: {rule_name} [red](failed)[/red]",
+                    )
+        except Exception as e:
+            self.add_to_log_display(
+                f"Error handling job error: {str(e)}", style="bold red"
+            )
+
+    def close(self):
+        """Clean up resources."""
+        if hasattr(self, "live"):
+            self.live.stop()
+        super().close()
