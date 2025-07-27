@@ -9,7 +9,10 @@ rule create_file:
     output:
         "output{num}.txt",
     shell:
-        "echo 'Content from file {wildcards.num}' > {output} && sleep 1"
+        """
+        echo 'Content from file {wildcards.num}' > {output}
+        sleep 1
+        """
 
 rule combine_files:
     input:

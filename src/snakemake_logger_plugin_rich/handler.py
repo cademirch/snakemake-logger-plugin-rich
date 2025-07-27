@@ -2,11 +2,15 @@ import logging
 import re
 from typing import Dict, Type, Optional, List
 from rich.logging import RichHandler
+#from rich.markdown import Markdown
+from rich.syntax import Syntax
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 from rich.console import Console, RenderableType
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
+from rich.markdown import Markdown
+from rich import box
 from rich.layout import Layout
 from rich.text import Text
 from pydantic import BaseModel
@@ -45,7 +49,7 @@ class RichLogHandler(RichHandler):
     ):
         
         kwargs["console"] = console
-        kwargs["show_path"] = True
+        kwargs["show_path"] = False
         kwargs["show_time"] = True
         kwargs["omit_repeated_times"] = False
         kwargs["rich_tracebacks"] = True
@@ -54,7 +58,7 @@ class RichLogHandler(RichHandler):
         super().__init__(*args, **kwargs)
 
         
-        self.console = console
+        self.console = Console(stderr=True, log_path=False)
         self.settings = settings
 
         
@@ -63,10 +67,12 @@ class RichLogHandler(RichHandler):
         
         self.progress = Progress(
             TextColumn("[bold blue]{task.description}"),
-            BarColumn(complete_style="green"),
+            BarColumn(complete_style="green", finished_style="dim green"),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn(),
-            console=None,
+            console=self.console,
+            transient = True,
+            auto_refresh = True,
         )
 
         
@@ -76,28 +82,27 @@ class RichLogHandler(RichHandler):
 
         
         self.log_messages: List[RenderableType] = []
+
         self.max_log_messages = 15  
 
         
-        self.logs_panel = Panel(Text(""), title="Logs", border_style="blue")
+        #self.logs_panel = Panel(Text(""), title="Logs", border_style="none")
         self.progress_panel = Panel(
-            self.progress, title="Rule Progress", border_style="green"
+            self.progress, title="Progress", border_style="dim"
         )
-
-        self.layout = Layout()
-        self.layout.split_column(
-            Layout(self.logs_panel, name="logs", size=15),  
-            Layout(
-                self.progress_panel, name="progress", size=10
-            ),  
-        )
+#
+        #self.layout = Layout()
+        #self.layout.split_column(
+        #    Layout(self.logs_panel, name="logs", size=15),  
+        #    Layout(self.progress_panel, name="progress"),  
+        #)
 
         
         self.live = Live(
-            self.layout,
-            console=console,
-            refresh_per_second=4,
-            auto_refresh=False,
+            self.progress_panel,
+            console=self.console,
+            refresh_per_second=8,
+            auto_refresh=True,
             vertical_overflow="crop",
         )
         self.live.start()
@@ -139,6 +144,12 @@ class RichLogHandler(RichHandler):
         skip_patterns = [
             "^Select jobs to execute",
             "^Assuming unrestricted shared filesystem",
+            "^Using shell:",
+            "^host:",
+            "^Provided cores:",
+            "^Rules claiming more threads will be",
+            r"^Execute \d+ jobs.",
+            "^Building DAG of jobs."
         ]
 
         for pattern in skip_patterns:
@@ -150,10 +161,9 @@ class RichLogHandler(RichHandler):
     def format_wildcards(self, wildcards):
         """Format wildcards into a string representation."""
         if not wildcards:
-            return ""
+            return "[dim]none[/]"
 
-        wildcards_str = ", ".join(f"{k}={v}" for k, v in wildcards.items())
-        return f" | wildcards: {wildcards_str}"
+        return ", ".join(f"[italic]{k}[/]: {v}" for k, v in wildcards.items())
 
     def truncate_message(self, message, max_length=100):
         """Truncate message to fit within max_length characters."""
@@ -165,29 +175,32 @@ class RichLogHandler(RichHandler):
         """Create custom formatted messages for specific event types."""
         if event_type == LogEvent.JOB_INFO:
             try:
-                
+
                 parser = self.parsers[event_type]
                 job_info = parser.from_record(record)
 
-                
+
                 self.jobs_info[job_info.jobid] = {
-                    "rule_name": job_info.rule_name,
-                    "wildcards": job_info.wildcards,
+                    "rule": job_info.rule_name,
+                    "wildcards": job_info.wildcards
                 }
+                # reveal progress bar for this rule if it's not already
+                self.progress.update(self.rule_tasks[job_info.rule_name], visible=True)
 
-                
-                wildcards_str = self.format_wildcards(job_info.wildcards)
-                message = f"Submitted job {job_info.jobid} | Rule: {job_info.rule_name}{wildcards_str}"
+                table = Table(show_header=False,pad_edge=False, show_edge=False, padding = (0,0), box=box.SIMPLE)
+                table.add_column("detail", justify="left", style="green", no_wrap=True)
+                table.add_column("value", justify="left")
+                table.add_row("Submitted: ", job_info.rule_name + f" [dim](id: {job_info.jobid})[/]")
+                table.add_row("Wildcards: ", self.format_wildcards(job_info.wildcards))
 
-                
-                return self.truncate_message(message)
+                return table
 
             except Exception as e:
                 return f"Error parsing job info: {str(e)}"
 
         elif event_type == LogEvent.JOB_FINISHED:
             try:
-                
+
                 parser = self.parsers[event_type]
                 job_finished = parser.from_record(record)
 
@@ -202,14 +215,17 @@ class RichLogHandler(RichHandler):
                 else:
                     message = f"Finished job {job_id}"
 
-                
+
                 return self.truncate_message(message)
 
             except Exception as e:
                 return f"Error creating job finished message: {str(e)}"
 
         elif event_type == LogEvent.SHELLCMD:
-            return
+            parser = self.parsers[event_type]
+            shellcmd = parser.from_record(record)
+            format_cmd = re.sub('^\n', '', re.sub(r' +', ' ', shellcmd.shellcmd)).rstrip()
+            return Syntax(format_cmd, lexer = "bash", padding=1)
 
         elif event_type == LogEvent.JOB_ERROR:
             try:
@@ -230,9 +246,10 @@ class RichLogHandler(RichHandler):
                 
                 parser = self.parsers[event_type]
                 run_info = parser.from_record(record)
-
-                
-                return f"Workflow run info: {len(run_info.job_ids)} jobs"
+                total = run_info.stats['total']
+                self.total_progress = self.progress.add_task("Total", total = total)
+                #self.console.log(f'Workflow run info: {run_info.stats["total"]}', style = "blue")
+                return f"Workflow run info: {run_info.stats['total']} jobs"
 
             except Exception as e:
                 return f"Error parsing run info: {str(e)}"
@@ -256,10 +273,11 @@ class RichLogHandler(RichHandler):
             
             self.log_messages.append(Text(message["message"]))
             
+            #cmd_text = Markdown(f"""```bash\n{message["command"]}\n```""")
             cmd_text = Text("    " + message["command"], style="yellow")
-            self.log_messages.append(cmd_text)
-            
-            self.update_log_panel()
+            #self.log_messages.append(cmd_text)
+            self.console.log(cmd_text)
+            #self.update_log_panel()
             return
 
         
@@ -278,9 +296,8 @@ class RichLogHandler(RichHandler):
 
         
         log_text = Text("\n").join(self.log_messages)
-
-        
-        self.logs_panel.renderable = log_text
+                
+        self.console.log(log_text)
 
         
         self.live.refresh()
@@ -301,7 +318,7 @@ class RichLogHandler(RichHandler):
                 
                 if record.levelno >= logging.ERROR and not event_type:
                     
-                    self.add_to_log_display(message, style="bold red")
+                    self.console.log(message, style="bold red")
                 
                 elif event_type:
                     custom_message = self.create_custom_message(record, event_type)
@@ -312,20 +329,20 @@ class RichLogHandler(RichHandler):
                     elif custom_message is not None:
                         
                         if isinstance(custom_message, str):
-                            
-                            self.add_to_log_display(custom_message)
+                            self.console.log(custom_message)
+                            #self.add_to_log_display(custom_message)
                         elif isinstance(custom_message, dict):
-                            
-                            self.add_to_log_display(custom_message)
+                            self.console.log(custom_message)
+                            #self.add_to_log_display(custom_message)
                         else:
-                            
-                            self.add_to_log_display(custom_message)
+                            self.console.log(custom_message)
+                            #self.add_to_log_display(custom_message)
                     else:
-                        
-                        self.add_to_log_display(message)
+                        self.console.log(message)
+                        #self.add_to_log_display(message)
                 else:
-                    
-                    self.add_to_log_display(message)
+                    self.console.log(message)
+                    #self.add_to_log_display(message)
 
             
             if event_type == LogEvent.RUN_INFO:
@@ -349,14 +366,15 @@ class RichLogHandler(RichHandler):
             parser = self.parsers[LogEvent.RUN_INFO]
             run_info = parser.from_record(record)
 
-            
+            #TODO DONT MAKE ALL PROGRESS BARS AT ONCE
             stats = run_info.stats
             if stats:
                 for rule, count in stats.items():
                     if rule != "total" and count > 0:
                         if rule not in self.rule_tasks:
                             task_id = self.progress.add_task(
-                                f"Rule: {rule}", total=count
+                                f"{rule}", total=count,
+                                visible= False
                             )
                             self.rule_tasks[rule] = task_id
                             self.total_jobs[rule] = count
@@ -375,7 +393,7 @@ class RichLogHandler(RichHandler):
             
             rule_name = job_info.rule_name
             if rule_name not in self.rule_tasks:
-                task_id = self.progress.add_task(f"Rule: {rule_name}", total=1)
+                task_id = self.progress.add_task(f"{rule_name}", total=1)
                 self.rule_tasks[rule_name] = task_id
                 self.total_jobs[rule_name] = 1
                 self.done_jobs[rule_name] = 0
@@ -409,12 +427,15 @@ class RichLogHandler(RichHandler):
                         self.progress.update(
                             task_id,
                             completed=total,
-                            description=f"[green]✓[/green] Rule: {rule_name}",
+                            description=f"[dim green]✓[/] {rule_name}",
                         )
                     else:
                         self.progress.update(task_id, completed=done)
+
+                    self.progress.update(self.total_progress, advance=1)
+
         except Exception as e:
-            self.add_to_log_display(
+            self.console.log(
                 f"Error parsing job finished: {str(e)}", style="bold red"
             )
 
@@ -436,7 +457,7 @@ class RichLogHandler(RichHandler):
                     
                     self.progress.update(
                         task_id,
-                        description=f"[red]✗[/red] Rule: {rule_name} [red](failed)[/red]",
+                        description=f"[red]✗[/] Rule: {rule_name} [red](failed)[/]",
                     )
         except Exception as e:
             self.add_to_log_display(
