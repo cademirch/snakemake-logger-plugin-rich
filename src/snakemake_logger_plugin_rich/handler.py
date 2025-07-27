@@ -268,37 +268,39 @@ class RichLogHandler(RichHandler):
         
         return None
 
-    def add_to_log_display(self, message, style=None):
-        """Add a message to the log display panel."""
-        
-        if isinstance(message, str):
-            if style:
-                message = Text(message, style=style)
-            else:
-                message = Text(message)
-
-        
-        elif (
-            isinstance(message, dict) and "message" in message and "command" in message
-        ):
-            
-            self.log_messages.append(Text(message["message"]))
-            
-            #cmd_text = Markdown(f"""```bash\n{message["command"]}\n```""")
-            cmd_text = Text("    " + message["command"], style="yellow")
-            #self.log_messages.append(cmd_text)
-            self.console.log(cmd_text)
-            #self.update_log_panel()
-            return
-
-        
-        self.log_messages.append(message)
-
-        
-        self.log_messages = self.log_messages[-self.max_log_messages :]
-
-        
-        self.update_log_panel()
+    #def add_to_log_display(self, message, style=None):
+    #    """Add a message to the log display panel."""
+    #    
+    #    if isinstance(message, str):
+    #        if style:
+    #            message = Text(message, style=style)
+    #        else:
+    #            message = Text(message)
+#
+    #    
+    #    elif (
+    #        isinstance(message, dict) and "message" in message and "command" in message
+    #    ):
+    #        
+    #        #self.log_messages.append(Text(message["message"]))
+    #        self.console.log(message["message"])
+#
+#
+    #        #cmd_text = Markdown(f"""```bash\n{message["command"]}\n```""")
+    #        cmd_text = Text("    " + message["command"], style="yellow")
+    #        #self.log_messages.append(cmd_text)
+    #        self.console.log(cmd_text)
+    #        #self.update_log_panel()
+    #        return
+#
+    #    
+    #    self.log_messages.append(message)
+#
+    #    
+    #    self.log_messages = self.log_messages[-self.max_log_messages :]
+#
+    #    
+    #    self.update_log_panel()
 
     def update_log_panel(self):
         """Update the log panel with the current log messages."""
@@ -341,21 +343,12 @@ class RichLogHandler(RichHandler):
                         pass
                     elif custom_message is not None:
                         
-                        if isinstance(custom_message, str):
-                            self.console.log(custom_message)
-                            #self.add_to_log_display(custom_message)
-                        elif isinstance(custom_message, dict):
-                            self.console.log(custom_message)
-                            #self.add_to_log_display(custom_message)
-                        else:
-                            self.console.log(custom_message)
-                            #self.add_to_log_display(custom_message)
+                        self.console.log(custom_message)
+
                     else:
                         self.console.log(message)
-                        #self.add_to_log_display(message)
                 else:
                     self.console.log(message)
-                    #self.add_to_log_display(message)
 
             
             if event_type == LogEvent.RUN_INFO:
@@ -369,7 +362,7 @@ class RichLogHandler(RichHandler):
 
         except Exception as e:
             
-            self.add_to_log_display(
+            self.console.log(
                 f"Error in logging handler: {str(e)}", style="bold red"
             )
 
@@ -404,6 +397,8 @@ class RichLogHandler(RichHandler):
 
             
             rule_name = job_info.rule_name
+            self.console.log(job_info)
+
             if rule_name not in self.rule_tasks:
                 task_id = self.progress.add_task(f"{rule_name}", total=1)
                 self.rule_tasks[rule_name] = task_id
