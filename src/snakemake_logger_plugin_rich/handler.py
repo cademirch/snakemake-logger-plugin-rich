@@ -161,12 +161,20 @@ class RichLogHandler(RichHandler):
     def format_wildcards(self, wildcards):
         """Format wildcards into a string representation."""
         if not wildcards:
-            return "[dim]none[/]"
+            return None
 
-        return ", ".join(f"[italic]{k}[/]: {v}" for k, v in wildcards.items())
+        wc_table = Table(show_header=False,pad_edge=False, show_edge=False, padding = (0,0), box=box.SIMPLE)
+        wc_table.add_column("wildcard", justify="left", no_wrap=True)
+        wc_table.add_column("value", justify="left")
+        for k,v in wildcards.items():
+            wc_table.add_row(f"[italic]{k}[/] : ", v)
+        return wc_table
+        #TODO remove deprecated
+        #return ", ".join(f"[italic]{k}[/]: {v}" for k, v in wildcards.items())
 
     def truncate_message(self, message, max_length=100):
         """Truncate message to fit within max_length characters."""
+        #TODO FLAGGED FOR REMOVAL SINCE CONSOLE HANDLES THIS
         if len(message) <= max_length:
             return message
         return message[: max_length - 3] + "..."
@@ -179,7 +187,6 @@ class RichLogHandler(RichHandler):
                 parser = self.parsers[event_type]
                 job_info = parser.from_record(record)
 
-
                 self.jobs_info[job_info.jobid] = {
                     "rule": job_info.rule_name,
                     "wildcards": job_info.wildcards
@@ -188,10 +195,12 @@ class RichLogHandler(RichHandler):
                 self.progress.update(self.rule_tasks[job_info.rule_name], visible=True)
 
                 table = Table(show_header=False,pad_edge=False, show_edge=False, padding = (0,0), box=box.SIMPLE)
-                table.add_column("detail", justify="left", style="green", no_wrap=True)
+                table.add_column("detail", justify="left", style="light_steel_blue", no_wrap=True)
                 table.add_column("value", justify="left")
                 table.add_row("Submitted: ", job_info.rule_name + f" [dim](id: {job_info.jobid})[/]")
-                table.add_row("Wildcards: ", self.format_wildcards(job_info.wildcards))
+                _wc = self.format_wildcards(job_info.wildcards)
+                if _wc:
+                    table.add_row("Wildcards: ", _wc)
 
                 return table
 
@@ -203,20 +212,23 @@ class RichLogHandler(RichHandler):
 
                 parser = self.parsers[event_type]
                 job_finished = parser.from_record(record)
+                table = Table(show_header=False,pad_edge=False, show_edge=False, padding = (0,0), box=box.SIMPLE)
+                table.add_column("detail", justify="left", style="green", no_wrap=True)
+                table.add_column("value", justify="left")
 
                 job_id = job_finished.job_id
                 if job_id in self.jobs_info:
                     info = self.jobs_info[job_id]
-                    rule_name = info["rule_name"]
-                    wildcards_str = self.format_wildcards(info["wildcards"])
-                    message = (
-                        f"Finished job {job_id} | Rule: {rule_name}{wildcards_str}"
-                    )
+                    _name = info["rule"]
+                    _wc = self.format_wildcards(info["wildcards"])
+                    table.add_row("Finished: ", _name + f" [dim](id: {job_id})[/]")
+                    if _wc:
+                        table.add_row("Wildcards: ", _wc)
                 else:
-                    message = f"Finished job {job_id}"
+                    table.add_row("Finished: ", f"job {job_id}[/]")
 
+                return table
 
-                return self.truncate_message(message)
 
             except Exception as e:
                 return f"Error creating job finished message: {str(e)}"
@@ -248,8 +260,7 @@ class RichLogHandler(RichHandler):
                 run_info = parser.from_record(record)
                 total = run_info.stats['total']
                 self.total_progress = self.progress.add_task("Total", total = total)
-                #self.console.log(f'Workflow run info: {run_info.stats["total"]}', style = "blue")
-                return f"Workflow run info: {run_info.stats['total']} jobs"
+                return f"Workflow: {run_info.stats['total']} jobs"
 
             except Exception as e:
                 return f"Error parsing run info: {str(e)}"
@@ -322,7 +333,9 @@ class RichLogHandler(RichHandler):
                 
                 elif event_type:
                     custom_message = self.create_custom_message(record, event_type)
-
+                    if event_type == LogEvent.RUN_INFO:
+                        self.console.rule(custom_message, style= "dim green")
+                        return
                     if custom_message is False:
                         
                         pass
@@ -366,7 +379,6 @@ class RichLogHandler(RichHandler):
             parser = self.parsers[LogEvent.RUN_INFO]
             run_info = parser.from_record(record)
 
-            #TODO DONT MAKE ALL PROGRESS BARS AT ONCE
             stats = run_info.stats
             if stats:
                 for rule, count in stats.items():
@@ -380,7 +392,7 @@ class RichLogHandler(RichHandler):
                             self.total_jobs[rule] = count
                             self.done_jobs[rule] = 0
         except Exception as e:
-            self.add_to_log_display(
+            self.console.log(
                 f"Error parsing run info: {str(e)}", style="bold red"
             )
 
@@ -398,7 +410,7 @@ class RichLogHandler(RichHandler):
                 self.total_jobs[rule_name] = 1
                 self.done_jobs[rule_name] = 0
         except Exception as e:
-            self.add_to_log_display(
+            self.console.log(
                 f"Error parsing job info: {str(e)}", style="bold red"
             )
 
@@ -412,7 +424,7 @@ class RichLogHandler(RichHandler):
             job_id = job_finished.job_id
 
             if job_id in self.jobs_info:
-                rule_name = self.jobs_info[job_id]["rule_name"]
+                rule_name = self.jobs_info[job_id]["rule"]
 
                 if rule_name in self.rule_tasks:
                     self.done_jobs[rule_name] = self.done_jobs.get(rule_name, 0) + 1
@@ -427,7 +439,7 @@ class RichLogHandler(RichHandler):
                         self.progress.update(
                             task_id,
                             completed=total,
-                            description=f"[dim green]✓[/] {rule_name}",
+                            description=f"[dim green]✓[/] [dim default]{rule_name}[/]",
                         )
                     else:
                         self.progress.update(task_id, completed=done)
@@ -460,7 +472,7 @@ class RichLogHandler(RichHandler):
                         description=f"[red]✗[/] Rule: {rule_name} [red](failed)[/]",
                     )
         except Exception as e:
-            self.add_to_log_display(
+            self.console.log(
                 f"Error handling job error: {str(e)}", style="bold red"
             )
 
