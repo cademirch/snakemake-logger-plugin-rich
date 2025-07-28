@@ -316,11 +316,11 @@ class EventHandler:
             return
         conda_depwarn = "Your conda installation is not configured to use" in message
         if conda_depwarn:
-            self.console.log(
+            self.console.print(
                 Panel(
                     Markdown("Adding `defaults` to the conda channel list implicitly is deprecated. To fix this, read [this guide](https://conda-forge.org/docs/user/tipsandtricks.html)."),
                     title = "Warning: conda channel configuration",
-                    style="yellow"
+                    border_style="yellow"
                 )
             )
             return
@@ -345,6 +345,10 @@ class EventHandler:
             self._complete_conda_status(env_name)
             return
 
+        if "Complete log" in message:
+            self.console.rule("Workflow Finished", style="green")
+            self.console.print("Complete Log:", message.split(":")[-1].strip(), soft_wrap=True)
+            return
 
     def _start_conda_status(self, env_name: str):
         """Start a spinning status for conda environment creation."""
