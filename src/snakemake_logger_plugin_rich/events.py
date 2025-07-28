@@ -1,43 +1,55 @@
 import uuid
-
+from dataclasses import dataclass, field
 from logging import LogRecord
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+# redefine these here until they are in logger interface
 
 
-class WorkflowStarted(BaseModel):
-    workflow_id: uuid.UUID
-    snakefile: str
-    execution_settings: Dict[str, Any]
-    remote_execution_settings: Dict[str, Any]
-    scheduling_settings: Dict[str, Any]
-    group_settings: Dict[str, Any]
-    resource_settings: Dict[str, Any]
+@dataclass
+class Error:
+    exception: Optional[str] = None
+    location: Optional[str] = None
+    rule: Optional[str] = None
+    traceback: Optional[str] = None
+    file: Optional[str] = None
+    line: Optional[str] = None
 
-    @field_validator("snakefile", mode="before")
     @classmethod
-    def validate_snakefile(cls, value):
-        try:
-            # Try to convert to string - this should work for PosixPath and other path-like objects
-            return str(value)
-        except (TypeError, ValueError) as e:
-            raise ValueError(f"Could not convert snakefile to string: {e}")
+    def from_record(cls, record: LogRecord) -> "Error":
+        return cls(
+            exception=getattr(record, "exception", None),
+            location=getattr(record, "location", None),
+            rule=getattr(record, "rule", None),
+            traceback=getattr(record, "traceback", None),
+            file=getattr(record, "file", None),
+            line=getattr(record, "line", None),
+        )
+
+
+@dataclass
+class WorkflowStarted:
+    workflow_id: uuid.UUID
+    snakefile: Optional[str]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.snakefile, str):
+            try:
+                # Try to convert to string - this should work for PosixPath and other path-like objects
+                self.snakefile = str(self.snakefile)
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"Could not convert snakefile to string: {e}")
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "WorkflowStarted":
         return cls(
-            workflow_id=getattr(record, "workflow_id", None),
-            snakefile=getattr(record, "snakefile", ""),
-            execution_settings=getattr(record, "execution_settings", {}),
-            remote_execution_settings=getattr(record, "remote_execution_settings", {}),
-            scheduling_settings=getattr(record, "scheduling_settings", {}),
-            group_settings=getattr(record, "group_settings", {}),
-            resource_settings=getattr(record, "resource_settings", {}),
+            workflow_id=getattr(record, "workflow_id"),
+            snakefile=getattr(record, "snakefile", None),
         )
 
 
-class JobInfo(BaseModel):
+@dataclass
+class JobInfo:
     jobid: int
     rule_name: str
     threads: int
@@ -46,19 +58,19 @@ class JobInfo(BaseModel):
     log: Optional[List[str]] = None
     benchmark: Optional[List[str]] = None
     rule_msg: Optional[str] = None
-    wildcards: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    wildcards: Optional[Dict[str, Any]] = field(default_factory=dict)
     reason: Optional[str] = None
     shellcmd: Optional[str] = None
     priority: Optional[int] = None
-    resources: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    resources: Optional[Dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobInfo":
         resources = {}
-        if hasattr(record, "resources") and hasattr(record.resources, "_names"):
+        if hasattr(record, "resources") and hasattr(record.resources, "_names"):  # type: ignore
             resources = {
                 name: value
-                for name, value in zip(record.resources._names, record.resources)
+                for name, value in zip(record.resources._names, record.resources)  # type: ignore
                 if name not in {"_cores", "_nodes"}
             }
 
@@ -79,7 +91,8 @@ class JobInfo(BaseModel):
         )
 
 
-class JobStarted(BaseModel):
+@dataclass
+class JobStarted:
     job_ids: List[int]
 
     @classmethod
@@ -94,18 +107,19 @@ class JobStarted(BaseModel):
         return cls(job_ids=jobs)
 
 
-class JobFinished(BaseModel):
+@dataclass
+class JobFinished:
     job_id: int
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobFinished":
-        return cls(job_id=getattr(record, "job_id", 0))
+        return cls(job_id=getattr(record, "job_id"))
 
 
-# New models for remaining event types
-class ShellCmd(BaseModel):
+@dataclass
+class ShellCmd:
     jobid: int
-    shellcmd: str
+    shellcmd: Optional[str] = None
     rule_name: Optional[str] = None
 
     @classmethod
@@ -117,7 +131,8 @@ class ShellCmd(BaseModel):
         )
 
 
-class JobError(BaseModel):
+@dataclass
+class JobError:
     jobid: int
 
     @classmethod
@@ -127,9 +142,10 @@ class JobError(BaseModel):
         )
 
 
-class GroupInfo(BaseModel):
+@dataclass
+class GroupInfo:
     group_id: int
-    jobs: List[Any] = Field(default_factory=list)
+    jobs: List[Any] = field(default_factory=list)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "GroupInfo":
@@ -138,43 +154,42 @@ class GroupInfo(BaseModel):
         )
 
 
-class GroupError(BaseModel):
+@dataclass
+class GroupError:
     groupid: int
-    aux_logs: List[Any] = Field(default_factory=list)
-    job_error_info: Dict[str, Any] = Field(default_factory=dict)
+    aux_logs: List[Any] = field(default_factory=list)
+    job_error_info: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "GroupError":
-        # Extract standard fields
-        result = cls(
+        return cls(
             groupid=getattr(record, "groupid", 0),
             aux_logs=getattr(record, "aux_logs", []),
             job_error_info=getattr(record, "job_error_info", {}),
         )
 
-        return result
 
-
-class ResourcesInfo(BaseModel):
+@dataclass
+class ResourcesInfo:
     nodes: Optional[List[str]] = None
     cores: Optional[int] = None
     provided_resources: Optional[Dict[str, Any]] = None
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "ResourcesInfo":
-        # Determine which type of resource info this is
         if hasattr(record, "nodes"):
-            return cls(nodes=record.nodes)
+            return cls(nodes=record.nodes)  # type: ignore
         elif hasattr(record, "cores"):
-            return cls(cores=record.cores)
+            return cls(cores=record.cores)  # type: ignore
         elif hasattr(record, "provided_resources"):
-            return cls(provided_resources=record.provided_resources)
+            return cls(provided_resources=record.provided_resources)  # type: ignore
         else:
             return cls()
 
 
-class DebugDag(BaseModel):
-    status: Optional[str] = None  # "candidate", "selected"
+@dataclass
+class DebugDag:
+    status: Optional[str] = None
     job: Optional[Any] = None
     file: Optional[str] = None
     exception: Optional[str] = None
@@ -189,7 +204,8 @@ class DebugDag(BaseModel):
         )
 
 
-class Progress(BaseModel):
+@dataclass
+class Progress:
     done: int
     total: int
 
@@ -198,7 +214,8 @@ class Progress(BaseModel):
         return cls(done=getattr(record, "done", 0), total=getattr(record, "total", 0))
 
 
-class RuleGraph(BaseModel):
+@dataclass
+class RuleGraph:
     rulegraph: Dict[str, Any]
 
     @classmethod
@@ -206,9 +223,18 @@ class RuleGraph(BaseModel):
         return cls(rulegraph=getattr(record, "rulegraph", {}))
 
 
-class RunInfo(BaseModel):
-    stats: Dict[str, Any] = Field(default_factory=dict)
+@dataclass
+class RunInfo:
+    per_rule_job_counts: Dict[str, int] = field(default_factory=dict)
+    total_job_count: int = 0
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "RunInfo":
-        return cls(stats=getattr(record, "stats", {}))
+        all_stats = getattr(record, "stats", {})
+
+        per_rule_job_counts = {k: v for k, v in all_stats.items() if k != "total"}
+
+        total_job_count = all_stats.get("total", 0)
+        return cls(
+            per_rule_job_counts=per_rule_job_counts, total_job_count=total_job_count
+        )
