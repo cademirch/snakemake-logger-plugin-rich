@@ -5,8 +5,10 @@ from rich.console import Console
 from rich.syntax import Syntax
 from rich.progress import Progress, TaskID
 from rich.table import Table
+from rich.status import Status
 from rich import box
 from typing import Dict
+from pathlib import Path
 from snakemake_interface_logger_plugins.common import LogEvent
 import snakemake_logger_plugin_rich.events as events
 import re
@@ -49,17 +51,15 @@ class ProgressDisplay:
             task_id = self.rule_tasks[rule]
 
         self.progress.update(task_id, completed=completed, total=total, refresh=True)
-        return task_id
 
-    def mark_rule_completed(self, rule: str):
-        """Mark a rule as completed with checkmark."""
-        if rule in self.rule_tasks:
-            task_id = self.rule_tasks[rule]
+        if completed >= total:
             self.progress.update(
                 task_id,
                 description=f"[dim green]✓[/] [dim default]{rule}[/]",
                 refresh=True,
             )
+
+        return task_id
 
     def mark_rule_failed(self, rule: str):
         """Update progress bar for a failed rule."""
@@ -92,9 +92,13 @@ class EventHandler:
         self.current_workflow_id: Optional[UUID] = None
         self.dryrun: bool = dryrun
         self.console = console
+        self.progress = progress
         self.progress_display = ProgressDisplay(progress)
         self.jobs_info = {}
         self.rule_counts = {}  # {rule_name: {"total": n, "completed": m}}
+        self.total_jobs = 0
+        self.completed = 0
+        self.conda_statuses = {}  # {env_path: Status object}
 
     def handle(self, record: LogRecord, **kwargs) -> None:
         """Process a log record, routing to appropriate handler based on event type."""
@@ -187,6 +191,10 @@ class EventHandler:
 
     def handle_job_finished(self, event_data: events.JobFinished, **kwargs) -> None:
         """Handle job finished event with rich formatting."""
+        # start progress display on first job finished
+        if self.completed == 0:
+            self.progress.disable = False
+            self.progress.start()
         job_id = event_data.job_id
 
         if job_id in self.jobs_info:
@@ -198,15 +206,12 @@ class EventHandler:
                 completed = self.rule_counts[rule_name]["completed"]
                 total = self.rule_counts[rule_name]["total"]
 
-                if completed >= total:
-                    self.progress_display.mark_rule_completed(rule_name)
-                else:
-                    self.progress_display.add_or_update(rule_name, completed, total)
+                self.progress_display.add_or_update(rule_name, completed, total)
 
-                if self.total_progress:
-                    self.progress_display.progress.update(
-                        self.total_progress, advance=1
-                    )
+            self.completed += 1
+            self.progress_display.add_or_update(
+                "Total Progress", self.completed, self.total_jobs
+            )
 
             table = Table(
                 show_header=False,
@@ -280,12 +285,13 @@ class EventHandler:
 
     def handle_run_info(self, event_data: events.RunInfo, **kwargs) -> None:
         """Handle run info event - sets up progress bars."""
-        total_jobs = event_data.total_job_count
-        if total_jobs > 0:
-            self.total_progress = self.progress_display.add_or_update(
-                "Total", 0, total_jobs
+        self.total_jobs = event_data.total_job_count
+
+        if self.total_jobs > 0:
+            self.total_progress_task = self.progress_display.add_or_update(
+                "Total Progress", 0, self.total_jobs
             )
-            self.console.rule(f"Workflow: {total_jobs} jobs", style="dim green")
+            self.console.rule(f"Workflow: {self.total_jobs} jobs", style="dim green")
 
         for rule, count in event_data.per_rule_job_counts.items():
             if count > 0:
@@ -295,12 +301,68 @@ class EventHandler:
     def handle_generic_event(
         self, event_type: LogEvent, record: LogRecord, **kwargs
     ) -> None:
-        """Handle events that don't have a specific handler defined.
-
-        Subclasses can override this method to provide custom handling for
-        unusual or unrecognized event types.
-        """
+        """Handle events that don't have a specific handler defined."""
         pass
+
+    def handle_generic_record(self, record: LogRecord, **kwargs) -> None:
+        """Handle log records that don't have an event type."""
+        message = record.getMessage()
+
+        if not self.should_log_message(record, message):
+            return
+
+        # Check for conda environment creation start
+        conda_create_match = re.search(
+            r"Creating conda environment (.+?)\.\.\..*", message
+        )
+        if conda_create_match:
+            env_path = conda_create_match.group(1)
+            env_name = Path(env_path).name
+            self._start_conda_status(env_name)
+            return
+
+        # Check for conda environment creation completion
+        conda_done_match = re.search(
+            r"Environment for (.+?) created \(location: (.+?)\)", message
+        )
+        if conda_done_match:
+            env_path = conda_done_match.group(1)
+            env_name = Path(env_path).name
+            self._complete_conda_status(env_name)
+            return
+
+    def _start_conda_status(self, env_name: str):
+        """Start a spinning status for conda environment creation."""
+
+        status = Status(
+            f"Creating conda environment [cyan]{env_name}[/cyan]...",
+            console=self.console,
+            spinner="dots",
+        )
+        status.start()
+        self.conda_statuses[env_name] = status
+
+    def _complete_conda_status(self, env_name: str):
+        """Complete the conda environment creation status."""
+        if env_name in self.conda_statuses:
+            status = self.conda_statuses[env_name]
+
+            self.console.log(
+                f"[green]✓[/green] Conda environment [cyan]{env_name}[/cyan] created."
+            )
+            status.stop()
+            del self.conda_statuses[env_name]
+
+        else:
+            self.console.log(
+                f"[green]✓[/green] Conda environment [cyan]{env_name}[/cyan] created"
+            )
+
+    def close(self):
+        """Clean up any active statuses."""
+        for status in self.conda_statuses.values():
+            status.stop()
+        self.conda_statuses.clear()
 
     def should_log_message(self, record, message):
         """Determine if we should log this message based on content filtering."""
@@ -328,10 +390,3 @@ class EventHandler:
                 return False
 
         return True
-
-    def handle_generic_record(self, record: LogRecord, **kwargs) -> None:
-        """Handle log records that don't have an event type.
-
-        Subclasses can override this method to handle non-event log records.
-        """
-        pass
