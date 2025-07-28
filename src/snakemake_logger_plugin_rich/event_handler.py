@@ -234,7 +234,6 @@ class EventHandler:
                 table.add_row("    Wildcards: ", wc_table)
 
             self.console.log("[bold green]◉ Finished[/]", table)
-            #self.console.log(table)
 
     def handle_shellcmd(self, event_data: events.ShellCmd, **kwargs) -> None:
         """Handle shell command event with syntax highlighting."""
@@ -242,25 +241,15 @@ class EventHandler:
             format_cmd = re.sub(
                 "^\n", "", re.sub(r" +", " ", event_data.shellcmd)
             ).rstrip()
-            shell_table = Table(
-                show_header=False,
-                pad_edge=False,
-                show_edge=False,
-                padding=(0,0),
-                box=box.SIMPLE,
+
+            shell_table = formatted_table(2, "default")
+            cmd = Syntax(
+                format_cmd,
+                lexer="bash",
+                padding=1
             )
-            shell_table.add_column("detail", justify="left", style="light_steel_blue")
-            shell_table.add_column("value", justify="left")
-            shell_table.add_row(
-                "    Shell:",
-                Syntax(
-                    format_cmd,
-                    lexer="bash",
-                    padding=1,
-                #    theme="paraiso-dark"
-                )
-            )
-            self.console.log(shell_table)
+            shell_table.add_row("     ", cmd)
+            self.console.log("[light_steel_blue]    Shell Command:[/]", shell_table)
 
     def handle_job_error(self, event_data: events.JobError, **kwargs) -> None:
         """Handle job error event."""
@@ -325,13 +314,12 @@ class EventHandler:
 
         if not self.should_log_message(record, message):
             return
-        #self.console.log(message, style = "yellow")
         conda_depwarn = "Your conda installation is not configured to use" in message
         if conda_depwarn:
             self.console.log(
                 Panel(
                     Markdown("Adding `defaults` to the conda channel list implicitly is deprecated. To fix this, read [this guide](https://conda-forge.org/docs/user/tipsandtricks.html)."),
-                    title = "Warning: Conda channel configuration",
+                    title = "Warning: conda channel configuration",
                     style="yellow"
                 )
             )
