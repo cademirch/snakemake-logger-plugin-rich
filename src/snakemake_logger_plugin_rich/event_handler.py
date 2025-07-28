@@ -116,9 +116,13 @@ class EventHandler:
         console: Console,
         progress: Progress,
         dryrun: bool = False,
+        printshellcmds: bool = False,
+        show_failed_logs: bool = False
     ):
         self.current_workflow_id: Optional[UUID] = None
         self.dryrun: bool = dryrun
+        self.print_shellcmd = printshellcmds
+        self.show_failed_logs = show_failed_logs
         self.console = console
         self.progress = progress
         self.progress_display = ProgressDisplay(progress, self.console)
@@ -167,7 +171,6 @@ class EventHandler:
             self.handle_generic_record(record, **kwargs)
 
 
-
     def handle_error(self, event_data: events.Error, **kwargs) -> None:
         """Handle error event."""
         pass
@@ -180,11 +183,10 @@ class EventHandler:
 
     def handle_job_info(self, event_data: events.JobInfo, **kwargs) -> None:
         """Handle job info event with rich formatting."""
-
-        # end current DAG status
         self.jobs_info[event_data.jobid] = {
             "rule": event_data.rule_name,
             "wildcards": event_data.wildcards,
+            "log": event_data.log
         }
 
         self.progress_display.set_visible(event_data.rule_name, True)
@@ -222,7 +224,7 @@ class EventHandler:
                 "Total Progress", self.completed, self.total_jobs
             )
 
-            finished_text = "[bold green]◉ Finished[/] " + info["rule"] + f" [dim](id: {job_id})[/]"
+            finished_text = "[bold green]◉ Finished[/] " + rule_name + f" [dim](id: {job_id})[/]"
             wc = format_wildcards(info["wildcards"])
             if wc:
                 finished_text += f"\n    [bold green]Wildcards:[/] {wc}"
@@ -231,6 +233,8 @@ class EventHandler:
 
     def handle_shellcmd(self, event_data: events.ShellCmd, **kwargs) -> None:
         """Handle shell command event with syntax highlighting."""
+        if not self.print_shellcmd:
+            return
         if event_data.shellcmd:
             format_cmd = re.sub(r" +", " ", event_data.shellcmd).rstrip()
             format_cmd = re.sub("^\n", "", format_cmd)
@@ -248,9 +252,23 @@ class EventHandler:
 
     def handle_job_error(self, event_data: events.JobError, **kwargs) -> None:
         """Handle job error event."""
-        self.console.log(
-            f"[bold red]ERROR[/bold red] in job {event_data.jobid}: Job failed"
-        )
+        job_id = event_data.jobid
+        if job_id in self.jobs_info:
+            info = self.jobs_info[job_id]
+            rule_name = info["rule"]
+            wc = format_wildcards(info["wildcards"])
+            failed_text = f"[bold yellow]✗ Failed[/] {rule_name} [dim yellow](id: {job_id})[/]"
+            if wc:
+                failed_text += f"\n    [bold yellow]Wildcards:[/] {wc}"
+            self.console.log(failed_text)
+            #TODO Not working like it's supposed to
+            if self.show_failed_logs:
+                for _log in info["log"]:
+                    self.console.rule(f"[bold]Log file: {_log}", style = "yellow")
+                    self.console.print(Path(_log).read_text())
+        else:
+            self.console.log(f"[bold yellow]✗ Failed job_id: {job_id})[/]")
+
 
     def handle_group_info(self, event_data: events.GroupInfo, **kwargs) -> None:
         """Handle group info event."""

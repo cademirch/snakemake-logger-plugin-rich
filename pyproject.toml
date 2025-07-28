@@ -34,7 +34,7 @@ snakemake-logger-plugin-rich = { path = ".", editable = true }
     args = [{ "arg" = "snakefile", "default" = "demo/Snakefile" }]
 
 [tool.pixi.feature.dev.tasks.dryrun]
-    cmd = "snakemake -s {{ snakefile }} -d demo/output --logger rich -n"
+    cmd = "snakemake -s {{ snakefile }} -d demo/output --show-failed-logs --logger rich -n"
     args = [{ "arg" = "snakefile", "default" = "demo/Snakefile" }]
 
 [tool.pixi.feature.dev.tasks.clean-demo]
