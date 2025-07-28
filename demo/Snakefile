@@ -12,7 +12,7 @@ rule create_file:
         "Test message"
     shell:
         """
-        echo 'Content from file {wildcards.num}' > {output}
+        echo 'Content from file {wildcards.num} and written to be kinda long the quick brown fox jumps over the lazy dog' > {output}
         sleep 1
         """
 

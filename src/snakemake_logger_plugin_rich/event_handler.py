@@ -238,14 +238,15 @@ class EventHandler:
     def handle_shellcmd(self, event_data: events.ShellCmd, **kwargs) -> None:
         """Handle shell command event with syntax highlighting."""
         if event_data.shellcmd:
-            format_cmd = re.sub(
-                "^\n", "", re.sub(r" +", " ", event_data.shellcmd)
-            ).rstrip()
-
+            format_cmd = re.sub(r" +", " ", event_data.shellcmd).rstrip()
+            format_cmd = re.sub("^\n", "", format_cmd)
             shell_table = formatted_table(2, "default")
             cmd = Syntax(
                 format_cmd,
+                dedent=True,
                 lexer="bash",
+                tab_size=2,
+                word_wrap=True,
                 padding=1
             )
             shell_table.add_row("     ", cmd)
