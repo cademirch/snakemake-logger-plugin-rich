@@ -1,11 +1,12 @@
 from logging import LogRecord
 from typing import Optional
 from uuid import UUID
-
+from rich.console import Console
+from rich.progress import Progress, TaskID
+from typing import Dict
 from snakemake_interface_logger_plugins.common import LogEvent
-
 import snakemake_logger_plugin_rich.events as events
-from snakemake_logger_plugin_rich.console import Console
+
 
 
 def format_wildcards(wildcards):
@@ -17,17 +18,46 @@ def format_wildcards(wildcards):
     return f" | wildcards: {wildcards_str}"
 
 
+class ProgressDisplay:
+    def __init__(self, progress: Progress):
+        self.progress = progress
+        self.rule_tasks: Dict[str, TaskID] = {}
+
+    def add_or_update(self, rule: str, completed: int, total: int):
+        if rule not in self.rule_tasks:
+            task_id = self.progress.add_task(description=rule, total=total)
+            self.rule_tasks[rule] = task_id
+        else:
+            task_id = self.rule_tasks[rule]
+
+        self.progress.update(task_id, completed=completed, total=total, refresh=True)
+
+    def mark_rule_failed(self, rule: str):
+        """Update progress bar for a failed rule."""
+        if rule in self.rule_tasks:
+            task_id = self.rule_tasks[rule]
+            self.progress.update(
+                task_id, description=f"[red]{rule} (failed)[/red]", refresh=True
+            )
+
+    def has_tasks(self) -> bool:
+        """Check if there are any active tasks."""
+        return len(self.rule_tasks) > 0
+
+
 class EventHandler:
     """Base class for processing Snakemake log events."""
 
     def __init__(
         self,
         console: Console,
+        progress: Progress,
         dryrun: bool = False,
     ):
         self.current_workflow_id: Optional[UUID] = None
         self.dryrun: bool = dryrun
         self.console = console
+        self.progress_display = ProgressDisplay(progress)
         self.jobs_info = {}
         self.rule_counts = {}  # {rule_name: {"total": n, "completed": m}}
 
@@ -77,7 +107,7 @@ class EventHandler:
         self, event_data: events.WorkflowStarted, **kwargs
     ) -> None:
         """Handle workflow started event."""
-        self.console.add_log(f"Workflow started: {event_data.workflow_id}")
+        self.console.log(f"Workflow started: {event_data.workflow_id}")
 
     def handle_job_info(self, event_data: events.JobInfo, **kwargs) -> None:
         """Handle job info event."""
@@ -87,7 +117,7 @@ class EventHandler:
         }
         wildcards_str = format_wildcards(event_data.wildcards)
         message = f"Submitted job {event_data.jobid} (Rule: {event_data.rule_name}{wildcards_str})"
-        self.console.add_log(message)
+        self.console.log(message)
 
     def handle_job_started(self, event_data: events.JobStarted, **kwargs) -> None:
         """Handle job started event."""
@@ -104,8 +134,8 @@ class EventHandler:
             if rule_name in self.rule_counts:
                 self.rule_counts[rule_name]["completed"] += 1
 
-            self.console.add_log(f"Finished job {job_id} (Rule: {rule_name})")
-            self.console.add_or_update_progress(
+            self.console.log(f"Finished job {job_id} (Rule: {rule_name})")
+            self.progress_display.add_or_update(
                 rule=f"Rule: {rule_name}",
                 completed=self.rule_counts[rule_name]["completed"],
                 total=self.rule_counts[rule_name]["total"],
@@ -117,7 +147,7 @@ class EventHandler:
 
     def handle_job_error(self, event_data: events.JobError, **kwargs) -> None:
         """Handle job error event."""
-        self.console.add_log(
+        self.console.log(
             f"[bold red]ERROR[/bold red] in job {event_data.jobid}: Job failed"
         )
 
@@ -150,7 +180,7 @@ class EventHandler:
         for rule, count in event_data.per_rule_job_counts.items():
             if count > 0:
                 self.rule_counts[rule] = {"total": count, "completed": 0}
-                self.console.add_or_update_progress(
+                self.progress_display.add_or_update(
                     rule=f"Rule: {rule}", completed=0, total=count
                 )
 

@@ -1,9 +1,8 @@
 import logging
-from typing import Optional
 from rich.logging import RichHandler
 from snakemake_interface_logger_plugins.settings import OutputSettingsLoggerInterface
-from snakemake_interface_logger_plugins.common import LogEvent
-from snakemake_logger_plugin_rich.console import Console
+from rich.console import Console
+from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 from snakemake_logger_plugin_rich.event_handler import EventHandler
 
 
@@ -15,13 +14,31 @@ class RichLogHandler(RichHandler):
 
     def __init__(
         self,
-        settings: Optional[OutputSettingsLoggerInterface] = None,
+        settings: OutputSettingsLoggerInterface,
         *args,
         **kwargs,
     ):
+        self.settings = settings
         self.console = Console()
-        self.event_handler = EventHandler(console=self.console)
-        kwargs["console"] = self.console.rich_console
+        self.progress = Progress(
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(complete_style="green"),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=self.console,
+            transient=False,
+            auto_refresh=False,
+        )
+
+        if not self.settings.dryrun:
+            self.progress.start()
+
+        self.event_handler = EventHandler(
+            console=self.console,
+            progress=self.progress,
+            dryrun=self.settings.dryrun,
+        )
+        kwargs["console"] = self.console
         kwargs["show_path"] = True
         kwargs["show_time"] = True
         kwargs["omit_repeated_times"] = False
@@ -29,8 +46,6 @@ class RichLogHandler(RichHandler):
         kwargs["tracebacks_width"] = 100
         kwargs["tracebacks_show_locals"] = False
         super().__init__(*args, **kwargs)
-
-        self.settings = settings
 
     def emit(self, record):
         """Process log records and delegate to event handler."""
