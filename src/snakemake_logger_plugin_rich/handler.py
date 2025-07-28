@@ -19,7 +19,7 @@ class RichLogHandler(RichHandler):
         **kwargs,
     ):
         self.settings = settings
-        self.console = Console()
+        self.console = Console(log_path=False)
         self.progress = Progress(
             TextColumn("[bold blue]{task.description}"),
             BarColumn(complete_style="green"),
@@ -28,10 +28,8 @@ class RichLogHandler(RichHandler):
             console=self.console,
             transient=False,
             auto_refresh=False,
+            disable=True,
         )
-
-        if not self.settings.dryrun:
-            self.progress.start()
 
         self.event_handler = EventHandler(
             console=self.console,
@@ -39,7 +37,6 @@ class RichLogHandler(RichHandler):
             dryrun=self.settings.dryrun,
         )
         kwargs["console"] = self.console
-        kwargs["show_path"] = False
         kwargs["show_time"] = True
         kwargs["omit_repeated_times"] = False
         kwargs["rich_tracebacks"] = True
@@ -67,4 +64,5 @@ class RichLogHandler(RichHandler):
 
     def close(self):
         """Clean up resources."""
+        self.event_handler.close()
         super().close()
