@@ -1,8 +1,8 @@
 import logging
 from rich.logging import RichHandler
-from snakemake_interface_logger_plugins.settings import OutputSettingsLoggerInterface
-from rich.console import Console
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
+from rich.console import Console
+from snakemake_interface_logger_plugins.settings import OutputSettingsLoggerInterface
 from snakemake_logger_plugin_rich.event_handler import EventHandler
 
 
@@ -39,7 +39,7 @@ class RichLogHandler(RichHandler):
             dryrun=self.settings.dryrun,
         )
         kwargs["console"] = self.console
-        kwargs["show_path"] = True
+        kwargs["show_path"] = False
         kwargs["show_time"] = True
         kwargs["omit_repeated_times"] = False
         kwargs["rich_tracebacks"] = True
