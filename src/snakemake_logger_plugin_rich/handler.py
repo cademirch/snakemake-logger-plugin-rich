@@ -22,7 +22,7 @@ class RichLogHandler(RichHandler):
         self.console = Console(log_path=False, stderr=True)
         self.progress = Progress(
             TextColumn("[bold blue]{task.description}"),
-            BarColumn(complete_style="green"),
+            BarColumn(complete_style="green", finished_style= "dim green"),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn(),
             console=self.console,
