@@ -181,6 +181,7 @@ class EventHandler:
     def handle_job_info(self, event_data: events.JobInfo, **kwargs) -> None:
         """Handle job info event with rich formatting."""
 
+        # end current DAG status
         self.jobs_info[event_data.jobid] = {
             "rule": event_data.rule_name,
             "wildcards": event_data.wildcards,
@@ -277,6 +278,10 @@ class EventHandler:
 
     def handle_run_info(self, event_data: events.RunInfo, **kwargs) -> None:
         """Handle run info event - sets up progress bars."""
+        try:
+            self.dag_status.stop()
+        except NameError:
+            pass
         self.total_jobs = event_data.total_job_count
 
         if self.total_jobs > 0:
@@ -344,8 +349,26 @@ class EventHandler:
             self.console.print("Complete Log:", message.split(":")[-1].strip(), soft_wrap=True)
             return
 
+        build_dag_match = re.search("^Building DAG of jobs", message)
+        if build_dag_match:
+            self._start_dag_status()
+
+    def _start_dag_status(self):
+        """Start a spinning status for conda environment creation."""
+        status = Status(
+            "Building workflow graph...",
+            console=self.console,
+            spinner="dots",
+        )
+        status.start()
+        self.dag_status = status
+
     def _start_conda_status(self, env_name: str):
         """Start a spinning status for conda environment creation."""
+        try:
+            self.dag_status.stop()
+        except NameError:
+            pass
         status = Status(
             f"Creating conda environment [cyan]{env_name}[/cyan]...",
             console=self.console,
@@ -395,7 +418,7 @@ class EventHandler:
             "^Provided cores:",
             "^Rules claiming more threads will be",
             r"^Execute \d+ jobs.",
-            "^Building DAG of jobs.",
+            #"^Building DAG of jobs.",
             "^Activating conda env",
         ]
 
