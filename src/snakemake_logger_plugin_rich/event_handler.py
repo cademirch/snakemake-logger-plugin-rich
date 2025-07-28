@@ -43,10 +43,10 @@ def format_wildcards(wildcards):
     if not wildcards:
         return None
 
-    wc_table = formatted_table(2, "default")
-    for k, v in wildcards.items():
-        wc_table.add_row(f"[italic]{k}[/] : ", v)
-    return wc_table
+    wc_text = []
+    for wc,v in wildcards.items():
+        wc_text.append(f"{wc}=[cyan]{v}[/]")
+    return ", ".join(wc_text)
 
 
 class ProgressDisplay:
@@ -189,16 +189,13 @@ class EventHandler:
         self.progress_display.set_visible(event_data.rule_name, True)
         submission_text = f"[bold light_steel_blue]◯ Submitted[/] {event_data.rule_name} [dim](id: {event_data.jobid})[/]"
 
-        table = formatted_table(2, "bold light_steel_blue")
-
-        wc_table = format_wildcards(event_data.wildcards)
-        if wc_table:
-            table.add_row("    Wildcards:", wc_table)
-
+        wc = format_wildcards(event_data.wildcards)
+        if wc:
+            submission_text += f"\n    [light_steel_blue]Wildcards:[/] {wc}"
         if event_data.rule_msg:
-            table.add_row("    Message:", event_data.rule_msg)
+            submission_text += f"\n    [light_steel_blue]Message:[/] {event_data.rule_msg}"
 
-        self.console.log(submission_text, table)
+        self.console.log(submission_text)
 
     def handle_job_started(self, event_data: events.JobStarted, **kwargs) -> None:
         """Handle job started event."""
@@ -225,13 +222,11 @@ class EventHandler:
             )
 
             finished_text = "[bold green]◉ Finished[/] " + info["rule"] + f" [dim](id: {job_id})[/]"
+            wc = format_wildcards(info["wildcards"])
+            if wc:
+                finished_text += f"\n    [bold green]Wildcards:[/] {wc}"
 
-            table = formatted_table(2, "bold green")
-            wc_table = format_wildcards(info["wildcards"])
-            if wc_table:
-                table.add_row("    Wildcards: ", wc_table)
-
-            self.console.log(finished_text, table)
+            self.console.log(finished_text)
 
     def handle_shellcmd(self, event_data: events.ShellCmd, **kwargs) -> None:
         """Handle shell command event with syntax highlighting."""
