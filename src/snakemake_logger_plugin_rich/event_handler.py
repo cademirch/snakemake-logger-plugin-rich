@@ -187,12 +187,9 @@ class EventHandler:
         }
 
         self.progress_display.set_visible(event_data.rule_name, True)
+        submission_text = f"[bold light_steel_blue]◯ Submitted[/] {event_data.rule_name} [dim](id: {event_data.jobid})[/]"
 
-        # Create rich formatted output
         table = formatted_table(2, "bold light_steel_blue")
-        table.add_row(
-            "    Rule:", event_data.rule_name + f" [dim](id: {event_data.jobid})[/]"
-        )
 
         wc_table = format_wildcards(event_data.wildcards)
         if wc_table:
@@ -201,7 +198,7 @@ class EventHandler:
         if event_data.rule_msg:
             table.add_row("    Message:", event_data.rule_msg)
 
-        self.console.log("[bold light_steel_blue]◯ Submitted[/]", table)
+        self.console.log(submission_text, table)
 
     def handle_job_started(self, event_data: events.JobStarted, **kwargs) -> None:
         """Handle job started event."""
@@ -227,13 +224,14 @@ class EventHandler:
                 "Total Progress", self.completed, self.total_jobs
             )
 
-            table = formatted_table(3, "bold green")
-            table.add_row("    Rule:", info["rule"] + f" [dim](id: {job_id})[/]")
+            finished_text = "[bold green]◉ Finished[/] " + info["rule"] + f" [dim](id: {job_id})[/]"
+
+            table = formatted_table(2, "bold green")
             wc_table = format_wildcards(info["wildcards"])
             if wc_table:
                 table.add_row("    Wildcards: ", wc_table)
 
-            self.console.log("[bold green]◉ Finished[/]", table)
+            self.console.log(finished_text, table)
 
     def handle_shellcmd(self, event_data: events.ShellCmd, **kwargs) -> None:
         """Handle shell command event with syntax highlighting."""
