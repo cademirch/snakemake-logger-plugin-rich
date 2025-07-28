@@ -40,5 +40,8 @@ snakemake-logger-plugin-rich = { path = ".", editable = true }
 [tool.pixi.feature.dev.tasks.clean-demo]
     cmd = "rm -r demo/output"
 
+[tool.pixi.feature.dev.dependencies]
+conda = ">=25.5.1,<26"
+
 [tool.pixi.feature.dev.tasks]
     demo = { depends-on = ["run-demo", "clean-demo"] }
