@@ -1,13 +1,15 @@
 rule all:
     input:
-        "output1.txt",
-        "output2.txt",
+        "output1.1.txt",
+        "output2.2.txt",
         "combined.txt",
 
 
 rule create_file:
     output:
-        "output{num}.txt",
+        "output{num}.{pandas}.txt"
+    message:
+        "Test message"
     shell:
         """
         echo 'Content from file {wildcards.num}' > {output}
@@ -16,9 +18,13 @@ rule create_file:
 
 rule combine_files:
     input:
-        "output1.txt",
-        "output2.txt",
+        "output1.1.txt",
+        "output2.2.txt"
     output:
-        "combined.txt",
+        "combined.txt"
+    message:
+        "Test message"
+    conda:
+        "envs/conda.yaml"
     shell:
         "cat {input} > {output}"

@@ -149,7 +149,8 @@ class RichLogHandler(RichHandler):
             "^Provided cores:",
             "^Rules claiming more threads will be",
             r"^Execute \d+ jobs.",
-            "^Building DAG of jobs."
+            "^Building DAG of jobs.",
+            "^Activating conda env"
         ]
 
         for pattern in skip_patterns:
@@ -169,15 +170,7 @@ class RichLogHandler(RichHandler):
         for k,v in wildcards.items():
             wc_table.add_row(f"[italic]{k}[/] : ", v)
         return wc_table
-        #TODO remove deprecated
-        #return ", ".join(f"[italic]{k}[/]: {v}" for k, v in wildcards.items())
 
-    def truncate_message(self, message, max_length=100):
-        """Truncate message to fit within max_length characters."""
-        #TODO FLAGGED FOR REMOVAL SINCE CONSOLE HANDLES THIS
-        if len(message) <= max_length:
-            return message
-        return message[: max_length - 3] + "..."
 
     def create_custom_message(self, record, event_type):
         """Create custom formatted messages for specific event types."""
@@ -194,14 +187,17 @@ class RichLogHandler(RichHandler):
                 # reveal progress bar for this rule if it's not already
                 self.progress.update(self.rule_tasks[job_info.rule_name], visible=True)
 
-                table = Table(show_header=False,pad_edge=False, show_edge=False, padding = (0,0), box=box.SIMPLE)
-                table.add_column("detail", justify="left", style="light_steel_blue", no_wrap=True)
+                table = Table(show_header=False,pad_edge=False, show_edge=False, padding = (0,2,0,0), box=box.SIMPLE)
+                #table.add_column("detail", justify="left", style="light_steel_blue", no_wrap=True)
+                table.add_column("detail", justify="left", style="bold light_steel_blue", no_wrap=True)
                 table.add_column("value", justify="left")
-                table.add_row("Submitted: ", job_info.rule_name + f" [dim](id: {job_info.jobid})[/]")
+                table.add_row("  Rule: ", job_info.rule_name + f" [dim](id: {job_info.jobid})[/]")
                 _wc = self.format_wildcards(job_info.wildcards)
                 if _wc:
-                    table.add_row("Wildcards: ", _wc)
-
+                    table.add_row("  Wildcards: ", _wc)
+                if job_info.rule_msg:
+                    table.add_row("  Message: ", job_info.rule_msg)
+                self.console.log("Submitted", style="bold light_steel_blue")
                 return table
 
             except Exception as e:
@@ -213,7 +209,8 @@ class RichLogHandler(RichHandler):
                 parser = self.parsers[event_type]
                 job_finished = parser.from_record(record)
                 table = Table(show_header=False,pad_edge=False, show_edge=False, padding = (0,0), box=box.SIMPLE)
-                table.add_column("detail", justify="left", style="green", no_wrap=True)
+                table.add_column("status", justify="left", style="bold green", no_wrap=True)
+                table.add_column("detail", justify="left")
                 table.add_column("value", justify="left")
 
                 job_id = job_finished.job_id
@@ -221,12 +218,12 @@ class RichLogHandler(RichHandler):
                     info = self.jobs_info[job_id]
                     _name = info["rule"]
                     _wc = self.format_wildcards(info["wildcards"])
-                    table.add_row("Finished: ", _name + f" [dim](id: {job_id})[/]")
+                    table.add_row("  Rule", _name + f" [dim](id: {job_id})[/]")
                     if _wc:
-                        table.add_row("Wildcards: ", _wc)
+                        table.add_row("  Wildcards: ", _wc)
                 else:
-                    table.add_row("Finished: ", f"job {job_id}[/]")
-
+                    table.add_row("  Job ID: ", job_id)
+                self.console.log("Finished", style = "bold green")
                 return table
 
 
@@ -237,7 +234,11 @@ class RichLogHandler(RichHandler):
             parser = self.parsers[event_type]
             shellcmd = parser.from_record(record)
             format_cmd = re.sub('^\n', '', re.sub(r' +', ' ', shellcmd.shellcmd)).rstrip()
-            return Syntax(format_cmd, lexer = "bash", padding=1)
+            shell_table = Table(show_header=False,pad_edge=False, show_edge=False, padding = (0,0), box=box.SIMPLE)
+            shell_table.add_column("detail", justify="left", style="light_steel_blue")#, no_wrap=True)
+            shell_table.add_column("value", justify="left")
+            shell_table.add_row("  Shell: ", Syntax(format_cmd, lexer = "bash", padding=1, theme = "paraiso-dark"))
+            return shell_table
 
         elif event_type == LogEvent.JOB_ERROR:
             try:
@@ -267,53 +268,6 @@ class RichLogHandler(RichHandler):
 
         
         return None
-
-    #def add_to_log_display(self, message, style=None):
-    #    """Add a message to the log display panel."""
-    #    
-    #    if isinstance(message, str):
-    #        if style:
-    #            message = Text(message, style=style)
-    #        else:
-    #            message = Text(message)
-#
-    #    
-    #    elif (
-    #        isinstance(message, dict) and "message" in message and "command" in message
-    #    ):
-    #        
-    #        #self.log_messages.append(Text(message["message"]))
-    #        self.console.log(message["message"])
-#
-#
-    #        #cmd_text = Markdown(f"""```bash\n{message["command"]}\n```""")
-    #        cmd_text = Text("    " + message["command"], style="yellow")
-    #        #self.log_messages.append(cmd_text)
-    #        self.console.log(cmd_text)
-    #        #self.update_log_panel()
-    #        return
-#
-    #    
-    #    self.log_messages.append(message)
-#
-    #    
-    #    self.log_messages = self.log_messages[-self.max_log_messages :]
-#
-    #    
-    #    self.update_log_panel()
-
-    def update_log_panel(self):
-        """Update the log panel with the current log messages."""
-        if not self.log_messages:
-            return
-
-        
-        log_text = Text("\n").join(self.log_messages)
-                
-        self.console.log(log_text)
-
-        
-        self.live.refresh()
 
     def emit(self, record):
         """Process log records and update progress bars."""
@@ -397,7 +351,7 @@ class RichLogHandler(RichHandler):
 
             
             rule_name = job_info.rule_name
-            self.console.log(job_info)
+            #self.console.log(job_info)
 
             if rule_name not in self.rule_tasks:
                 task_id = self.progress.add_task(f"{rule_name}", total=1)
