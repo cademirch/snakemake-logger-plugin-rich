@@ -4,8 +4,11 @@ from uuid import UUID
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.progress import Progress, TaskID
-from rich.table import Table
+from rich.live import Live
+from rich.markdown import Markdown
 from rich.status import Status
+from rich.panel import Panel
+from rich.table import Table
 from rich import box
 from typing import Dict
 from pathlib import Path
@@ -15,36 +18,60 @@ import re
 import logging
 
 
+def formatted_table(cols: int, left_col_style: str):
+    """Convenience function that returns a table with standardized formatting"""
+    _table = Table(
+        show_header=False,
+        pad_edge=False,
+        show_edge=False,
+        padding=(0,0),
+        box=box.SIMPLE,
+    )
+    # the column name is irrelevant b/c headers won't be shown
+    _table.add_column("detail", justify="left", style=left_col_style, no_wrap=True)
+    for i in range(cols-1):
+        _table.add_column(f"col_{i}", justify="left")
+    return _table
+
+def prettyprint_rule(rule: str) -> str:
+    """Format the rule name to replace underscores with spaces and strip extra spaces"""
+    return re.sub(" +", " ", rule.replace('_', ' ')).strip()
+
+
 def format_wildcards(wildcards):
     """Format wildcards into a string representation."""
     if not wildcards:
         return None
 
-    wc_table = Table(
-        show_header=False,
-        pad_edge=False,
-        show_edge=False,
-        padding=(0, 0),
-        box=box.SIMPLE,
-    )
-    wc_table.add_column("wildcard", justify="left", no_wrap=True)
-    wc_table.add_column("value", justify="left")
+    wc_table = formatted_table(2, "default")
     for k, v in wildcards.items():
         wc_table.add_row(f"[italic]{k}[/] : ", v)
     return wc_table
 
 
 class ProgressDisplay:
-    def __init__(self, progress: Progress):
+    def __init__(self, progress: Progress, console: Console):
+
         self.progress = progress
         self.rule_tasks: Dict[str, TaskID] = {}
+        self.live_display = Live(
+            Panel(
+                progress,
+                title = "Workflow Progress",
+                border_style="dim"
+            ),
+            refresh_per_second=4,
+            transient=True,
+            console= console
+        )
 
     def add_or_update(
         self, rule: str, completed: int, total: int, visible: bool = True
     ):
+        _rule = prettyprint_rule(rule)
         if rule not in self.rule_tasks:
             task_id = self.progress.add_task(
-                description=rule, total=total, visible=visible
+                description=_rule, total=total, visible=visible
             )
             self.rule_tasks[rule] = task_id
         else:
@@ -55,18 +82,19 @@ class ProgressDisplay:
         if completed >= total:
             self.progress.update(
                 task_id,
-                description=f"[dim green]✓[/] [dim default]{rule}[/]",
-                refresh=True,
+                description=f"[dim green]✓[/] [dim default]{_rule}[/]",
+                refresh=True
             )
 
         return task_id
 
     def mark_rule_failed(self, rule: str):
         """Update progress bar for a failed rule."""
+        _rule = prettyprint_rule(rule)
         if rule in self.rule_tasks:
             task_id = self.rule_tasks[rule]
             self.progress.update(
-                task_id, description=f"[red]✗[/] {rule} [red](failed)[/]", refresh=True
+                task_id, description=f"[red]✗[/] {_rule} [red](failed)[/]", refresh=True
             )
 
     def set_visible(self, rule: str, visible: bool = True):
@@ -93,7 +121,7 @@ class EventHandler:
         self.dryrun: bool = dryrun
         self.console = console
         self.progress = progress
-        self.progress_display = ProgressDisplay(progress)
+        self.progress_display = ProgressDisplay(progress, self.console)
         self.jobs_info = {}
         self.rule_counts = {}  # {rule_name: {"total": n, "completed": m}}
         self.total_jobs = 0
@@ -138,6 +166,8 @@ class EventHandler:
         else:
             self.handle_generic_record(record, **kwargs)
 
+
+
     def handle_error(self, event_data: events.Error, **kwargs) -> None:
         """Handle error event."""
         pass
@@ -146,7 +176,7 @@ class EventHandler:
         self, event_data: events.WorkflowStarted, **kwargs
     ) -> None:
         """Handle workflow started event."""
-        self.console.log(f"Workflow started: {event_data.workflow_id}")
+        self.console.rule(f"Workflow {event_data.workflow_id}", style = "green")
 
     def handle_job_info(self, event_data: events.JobInfo, **kwargs) -> None:
         """Handle job info event with rich formatting."""
@@ -159,31 +189,19 @@ class EventHandler:
         self.progress_display.set_visible(event_data.rule_name, True)
 
         # Create rich formatted output
-        table = Table(
-            show_header=False,
-            pad_edge=False,
-            show_edge=False,
-            padding=(0, 2, 0, 0),
-            box=box.SIMPLE,
-        )
-        table.add_column(
-            "detail", justify="left", style="bold light_steel_blue", no_wrap=True
-        )
-        table.add_column("value", justify="left")
-
+        table = formatted_table(2, "bold light_steel_blue")
         table.add_row(
-            "  Rule: ", event_data.rule_name + f" [dim](id: {event_data.jobid})[/]"
+            "    Rule:", event_data.rule_name + f" [dim](id: {event_data.jobid})[/]"
         )
 
         wc_table = format_wildcards(event_data.wildcards)
         if wc_table:
-            table.add_row("  Wildcards: ", wc_table)
+            table.add_row("    Wildcards:", wc_table)
 
         if event_data.rule_msg:
-            table.add_row("  Message: ", event_data.rule_msg)
+            table.add_row("    Message:", event_data.rule_msg)
 
-        self.console.log("Submitted", style="bold light_steel_blue")
-        self.console.log(table)
+        self.console.log("[bold light_steel_blue]◯ Submitted[/]", table)
 
     def handle_job_started(self, event_data: events.JobStarted, **kwargs) -> None:
         """Handle job started event."""
@@ -191,10 +209,6 @@ class EventHandler:
 
     def handle_job_finished(self, event_data: events.JobFinished, **kwargs) -> None:
         """Handle job finished event with rich formatting."""
-        # start progress display on first job finished
-        if self.completed == 0:
-            self.progress.disable = False
-            self.progress.start()
         job_id = event_data.job_id
 
         if job_id in self.jobs_info:
@@ -213,24 +227,14 @@ class EventHandler:
                 "Total Progress", self.completed, self.total_jobs
             )
 
-            table = Table(
-                show_header=False,
-                pad_edge=False,
-                show_edge=False,
-                padding=(0, 0),
-                box=box.SIMPLE,
-            )
-            table.add_column("status", justify="left", style="bold green", no_wrap=True)
-            table.add_column("detail", justify="left")
-            table.add_column("value", justify="left")
-
-            table.add_row("  Rule", info["rule"] + f" [dim](id: {job_id})[/]")
+            table = formatted_table(3, "bold green")
+            table.add_row("    Rule:", info["rule"] + f" [dim](id: {job_id})[/]")
             wc_table = format_wildcards(info["wildcards"])
             if wc_table:
-                table.add_row("  Wildcards: ", wc_table)
+                table.add_row("    Wildcards: ", wc_table)
 
-            self.console.log("Finished", style="bold green")
-            self.console.log(table)
+            self.console.log("[bold green]◉ Finished[/]", table)
+            #self.console.log(table)
 
     def handle_shellcmd(self, event_data: events.ShellCmd, **kwargs) -> None:
         """Handle shell command event with syntax highlighting."""
@@ -242,14 +246,19 @@ class EventHandler:
                 show_header=False,
                 pad_edge=False,
                 show_edge=False,
-                padding=(0, 0),
+                padding=(0,0),
                 box=box.SIMPLE,
             )
             shell_table.add_column("detail", justify="left", style="light_steel_blue")
             shell_table.add_column("value", justify="left")
             shell_table.add_row(
-                "  Shell: ",
-                Syntax(format_cmd, lexer="bash", padding=1, theme="paraiso-dark"),
+                "    Shell:",
+                Syntax(
+                    format_cmd,
+                    lexer="bash",
+                    padding=1,
+                #    theme="paraiso-dark"
+                )
             )
             self.console.log(shell_table)
 
@@ -291,7 +300,13 @@ class EventHandler:
             self.total_progress_task = self.progress_display.add_or_update(
                 "Total Progress", 0, self.total_jobs
             )
-            self.console.rule(f"Workflow: {self.total_jobs} jobs", style="dim green")
+            self.console.log(f"Processing Workflow: {self.total_jobs} jobs", style="blue")
+            self.progress.disable = False
+            # end any existing conda statuses
+            for status in self.conda_statuses.values():
+                status.stop()
+            self.conda_statuses.clear()
+            self.progress_display.live_display.start()
 
         for rule, count in event_data.per_rule_job_counts.items():
             if count > 0:
@@ -309,6 +324,17 @@ class EventHandler:
         message = record.getMessage()
 
         if not self.should_log_message(record, message):
+            return
+        #self.console.log(message, style = "yellow")
+        conda_depwarn = "Your conda installation is not configured to use" in message
+        if conda_depwarn:
+            self.console.log(
+                Panel(
+                    Markdown("Adding `defaults` to the conda channel list implicitly is deprecated. To fix this, read [this guide](https://conda-forge.org/docs/user/tipsandtricks.html)."),
+                    title = "Warning: Conda channel configuration",
+                    style="yellow"
+                )
+            )
             return
 
         # Check for conda environment creation start
@@ -331,9 +357,9 @@ class EventHandler:
             self._complete_conda_status(env_name)
             return
 
+
     def _start_conda_status(self, env_name: str):
         """Start a spinning status for conda environment creation."""
-
         status = Status(
             f"Creating conda environment [cyan]{env_name}[/cyan]...",
             console=self.console,
@@ -346,23 +372,25 @@ class EventHandler:
         """Complete the conda environment creation status."""
         if env_name in self.conda_statuses:
             status = self.conda_statuses[env_name]
-
             self.console.log(
-                f"[green]✓[/green] Conda environment [cyan]{env_name}[/cyan] created."
+                f"[green]◉ Created[/] conda environment [cyan]{env_name}[/cyan]"
             )
             status.stop()
             del self.conda_statuses[env_name]
 
         else:
             self.console.log(
-                f"[green]✓[/green] Conda environment [cyan]{env_name}[/cyan] created"
+                f"[green]◉ Created[/] conda environment [cyan]{env_name}[/cyan]"
             )
+            return
 
     def close(self):
         """Clean up any active statuses."""
         for status in self.conda_statuses.values():
             status.stop()
         self.conda_statuses.clear()
+        self.progress_display.progress.stop()
+        self.progress_display.live_display.stop()
 
     def should_log_message(self, record, message):
         """Determine if we should log this message based on content filtering."""

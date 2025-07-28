@@ -19,14 +19,14 @@ class RichLogHandler(RichHandler):
         **kwargs,
     ):
         self.settings = settings
-        self.console = Console(log_path=False)
+        self.console = Console(log_path=False, stderr=True)
         self.progress = Progress(
             TextColumn("[bold blue]{task.description}"),
             BarColumn(complete_style="green"),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn(),
             console=self.console,
-            transient=False,
+            transient=True,
             auto_refresh=False,
             disable=True,
         )
