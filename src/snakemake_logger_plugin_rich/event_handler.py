@@ -262,10 +262,11 @@ class EventHandler:
                 failed_text += f"\n    [bold yellow]Wildcards:[/] {wc}"
             self.console.log(failed_text)
             #TODO Not working like it's supposed to
-            if self.show_failed_logs:
-                for _log in info["log"]:
-                    self.console.rule(f"[bold]Log file: {_log}", style = "yellow")
-                    self.console.print(Path(_log).read_text())
+            #self.console.log(info["log"])
+            #if self.show_failed_logs:
+            for _log in info["log"]:
+                self.console.rule(f"[bold]Log file: {_log}", style = "yellow")
+                self.console.print(Path(_log).read_text(), highlight=False)
         else:
             self.console.log(f"[bold yellow]✗ Failed job_id: {job_id})[/]")
 
