@@ -1,20 +1,19 @@
 rule all:
     input:
-        "output1.1.txt",
-        "output2.2.txt",
+        collect("output{x}.{y}.txt", x = range(5), y = range(5)),
         "combined.txt",
-        "fail.txt"
+        #"fail.txt"
 
 
 rule create_file:
     output:
-        "output{num}.{pandas}.txt"
+        "output{x}.{y}.txt"
     message:
         "Test message"
     shell:
         """
-        echo 'Content from file {wildcards.num} and written to be kinda long the quick brown fox jumps over the lazy dog' > {output}
-        sleep 1
+        echo 'Content from file {wildcards.x}.{wildcards.y} and written to be kinda long the quick brown fox jumps over the lazy dog' > {output}
+        sleep 2
         """
 
 rule forced_failure:
@@ -27,8 +26,7 @@ rule forced_failure:
 
 rule combine_files:
     input:
-        "output1.1.txt",
-        "output2.2.txt"
+        collect("output{x}.{y}.txt", x = range(5), y = range(5))
     output:
         "combined.txt"
     message:

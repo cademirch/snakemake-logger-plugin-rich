@@ -1,4 +1,5 @@
 from logging import LogRecord
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 from rich.console import Console
@@ -8,7 +9,9 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich.status import Status
 from rich.panel import Panel
+from rich.layout import Layout
 from rich.table import Table
+from rich.console import Group
 from rich import box
 from typing import Dict
 from pathlib import Path
@@ -16,6 +19,10 @@ from snakemake_interface_logger_plugins.common import LogEvent
 import snakemake_logger_plugin_rich.events as events
 import re
 import logging
+
+def get_time():
+    _time = datetime.now()
+    return f"{_time.date()} {_time.hour}:{_time.minute}:{_time.second}"
 
 
 def formatted_table(cols: int, left_col_style: str):
@@ -53,13 +60,24 @@ class ProgressDisplay:
     def __init__(self, progress: Progress, console: Console):
 
         self.progress = progress
+        self.layout = Layout()
+        self.layout.split_column(
+            Layout(Panel("◯ Last Submitted", box = box.SIMPLE, padding = 0), name = "submitted", size = 15),
+            Layout(Panel("◉ Last Finished", box = box.SIMPLE, padding = 0), name = "finished", size=2),
+            Layout(
+                Panel(
+                    progress,
+                    title = "Workflow Progress",
+                    #border_style="dim",
+                    box = box.SIMPLE
+                ),
+                name = "progress", minimum_size=4
+            )
+        )
+
         self.rule_tasks: Dict[str, TaskID] = {}
         self.live_display = Live(
-            Panel(
-                progress,
-                title = "Workflow Progress",
-                border_style="dim"
-            ),
+            self.layout,
             refresh_per_second=4,
             transient=True,
             console= console
@@ -190,15 +208,32 @@ class EventHandler:
         }
 
         self.progress_display.set_visible(event_data.rule_name, True)
-        submission_text = f"[bold light_steel_blue]◯ Submitted[/] {event_data.rule_name} [dim](id: {event_data.jobid})[/]"
+        submission_text = f"[bold light_steel_blue]◯ Last Submitted[/] {event_data.rule_name} [dim](id: {event_data.jobid})[/] [dim light_steel_blue]{get_time()}[/]"
 
         wc = format_wildcards(event_data.wildcards)
         if wc:
             submission_text += f"\n    [light_steel_blue]Wildcards:[/] {wc}"
         if event_data.rule_msg:
             submission_text += f"\n    [light_steel_blue]Message:[/] {event_data.rule_msg}"
+        if event_data.shellcmd:
+            format_cmd = re.sub(r" +", " ", event_data.shellcmd).rstrip()
+            format_cmd = re.sub("^\n", "", format_cmd)
+            submission_text += "\n    [light_steel_blue]Shell Command:[/]"
+            shell_table = formatted_table(2, "default")
+            cmd = Syntax(
+                format_cmd,
+                dedent=True,
+                lexer="bash",
+                tab_size=2,
+                word_wrap=True,
+                padding=1
+            )
+            shell_table.add_row("     ", cmd)
+            self.progress_display.layout["submitted"].update(Group(submission_text, shell_table))
+        else:
+            self.progress_display.layout["submitted"].update(submission_text)
 
-        self.console.log(submission_text)
+        #self.console.log(submission_text)
 
     def handle_job_started(self, event_data: events.JobStarted, **kwargs) -> None:
         """Handle job started event."""
@@ -224,12 +259,13 @@ class EventHandler:
                 "Total Progress", self.completed, self.total_jobs
             )
 
-            finished_text = "[bold green]◉ Finished[/] " + rule_name + f" [dim](id: {job_id})[/]"
+            finished_text = "[bold green]◉ Last Finished[/] " + rule_name + f" [dim](id: {job_id})[/] [dim green]{get_time()}[/]"
             wc = format_wildcards(info["wildcards"])
             if wc:
                 finished_text += f"\n    [bold green]Wildcards:[/] {wc}"
 
-            self.console.log(finished_text)
+            self.progress_display.layout["finished"].update(finished_text)
+            #self.console.log(finished_text)
 
     def handle_shellcmd(self, event_data: events.ShellCmd, **kwargs) -> None:
         """Handle shell command event with syntax highlighting."""
@@ -307,7 +343,7 @@ class EventHandler:
             self.total_progress_task = self.progress_display.add_or_update(
                 "Total Progress", 0, self.total_jobs
             )
-            self.console.log(f"Processing Workflow: {self.total_jobs} jobs", style="blue")
+            #self.console.log(f"Processing Workflow: {self.total_jobs} jobs", style="blue")
             self.progress.disable = False
             # end any existing conda statuses
             for status in self.conda_statuses.values():
