@@ -13,7 +13,7 @@ rule create_file:
     shell:
         """
         echo 'Content from file {wildcards.x}.{wildcards.y} and written to be kinda long the quick brown fox jumps over the lazy dog' > {output}
-        sleep 2
+        sleep 1
         """
 
 rule forced_failure:

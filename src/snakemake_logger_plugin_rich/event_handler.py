@@ -5,14 +5,14 @@ from uuid import UUID
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.progress import Progress, TaskID
+from rich.layout import Layout
 from rich.live import Live
+from rich import box
 from rich.markdown import Markdown
 from rich.status import Status
 from rich.panel import Panel
-from rich.layout import Layout
 from rich.table import Table
 from rich.console import Group
-from rich import box
 from typing import Dict
 from pathlib import Path
 from snakemake_interface_logger_plugins.common import LogEvent
@@ -57,37 +57,19 @@ def format_wildcards(wildcards):
 
 
 class ProgressDisplay:
-    def __init__(self, progress: Progress, console: Console):
+    def __init__(self, progress: Progress, layout: Layout, live: Live, console: Console):
 
         self.progress = progress
-        self.layout = Layout()
-        self.layout.split_column(
-            Layout(Panel("◯ Last Submitted", box = box.SIMPLE, padding = 0), name = "submitted", size = 15),
-            Layout(Panel("◉ Last Finished", box = box.SIMPLE, padding = 0), name = "finished", size=2),
-            Layout(
-                Panel(
-                    progress,
-                    title = "Workflow Progress",
-                    #border_style="dim",
-                    box = box.SIMPLE
-                ),
-                name = "progress", minimum_size=4
-            )
-        )
-
+        self.layout = layout
+        self.live_display = live
         self.rule_tasks: Dict[str, TaskID] = {}
-        self.live_display = Live(
-            self.layout,
-            refresh_per_second=4,
-            transient=True,
-            console= console
-        )
 
     def add_or_update(
         self, rule: str, completed: int, total: int, visible: bool = True
     ):
         _rule = prettyprint_rule(rule)
         if rule not in self.rule_tasks:
+            self.layout["progress"].size += 1
             task_id = self.progress.add_task(
                 description=_rule, total=total, visible=visible
             )
@@ -95,13 +77,12 @@ class ProgressDisplay:
         else:
             task_id = self.rule_tasks[rule]
 
-        self.progress.update(task_id, completed=completed, total=total, refresh=True)
+        self.progress.update(task_id, completed=completed, total=total)
 
         if completed >= total:
             self.progress.update(
                 task_id,
-                description=f"[dim green]✓[/] [dim default]{_rule}[/]",
-                refresh=True
+                description=f"[dim green]✓[/] [dim default]{_rule}[/]"
             )
 
         return task_id
@@ -112,14 +93,15 @@ class ProgressDisplay:
         if rule in self.rule_tasks:
             task_id = self.rule_tasks[rule]
             self.progress.update(
-                task_id, description=f"[red]✗[/] {_rule} [red](failed)[/]", refresh=True
+                task_id, description=f"[red]✗[/] {_rule} [red](failed)[/]"
             )
 
     def set_visible(self, rule: str, visible: bool = True):
         """Set visibility of a progress bar."""
         if rule in self.rule_tasks:
             task_id = self.rule_tasks[rule]
-            self.progress.update(task_id, visible=visible, refresh=True)
+            self.progress.update(task_id, visible=visible)
+
 
     def has_tasks(self) -> bool:
         """Check if there are any active tasks."""
@@ -133,6 +115,8 @@ class EventHandler:
         self,
         console: Console,
         progress: Progress,
+        layout: Layout,
+        live_display: Live,
         dryrun: bool = False,
         printshellcmds: bool = False,
         show_failed_logs: bool = False
@@ -143,7 +127,7 @@ class EventHandler:
         self.show_failed_logs = show_failed_logs
         self.console = console
         self.progress = progress
-        self.progress_display = ProgressDisplay(progress, self.console)
+        self.progress_display = ProgressDisplay(progress, layout, live_display, self.console)
         self.jobs_info = {}
         self.rule_counts = {}  # {rule_name: {"total": n, "completed": m}}
         self.total_jobs = 0
@@ -208,17 +192,25 @@ class EventHandler:
         }
 
         self.progress_display.set_visible(event_data.rule_name, True)
-        submission_text = f"[bold light_steel_blue]◯ Last Submitted[/] {event_data.rule_name} [dim](id: {event_data.jobid})[/] [dim light_steel_blue]{get_time()}[/]"
-
+        submission_text = []
+        submission_text.append(
+            f"[bold light_steel_blue]◯ Last Submitted[/] {event_data.rule_name} [dim](id: {event_data.jobid})[/] [dim light_steel_blue]{get_time()}[/]"
+        )
         wc = format_wildcards(event_data.wildcards)
         if wc:
-            submission_text += f"\n    [light_steel_blue]Wildcards:[/] {wc}"
+            submission_text.append(
+                f"[light_steel_blue]Wildcards:[/] {wc}"
+            )
         if event_data.rule_msg:
-            submission_text += f"\n    [light_steel_blue]Message:[/] {event_data.rule_msg}"
-        if event_data.shellcmd:
+            submission_text.append(
+                f"[light_steel_blue]Message:[/] {event_data.rule_msg}"
+            )
+        if self.print_shellcmd and event_data.shellcmd:
             format_cmd = re.sub(r" +", " ", event_data.shellcmd).rstrip()
             format_cmd = re.sub("^\n", "", format_cmd)
-            submission_text += "\n    [light_steel_blue]Shell Command:[/]"
+            submission_text.append(
+                "[light_steel_blue]Shell Command:[/]"
+            )
             shell_table = formatted_table(2, "default")
             cmd = Syntax(
                 format_cmd,
@@ -229,11 +221,14 @@ class EventHandler:
                 padding=1
             )
             shell_table.add_row("     ", cmd)
-            self.progress_display.layout["submitted"].update(Group(submission_text, shell_table))
+            shell_lines = format_cmd.count("\n") + 3
+            out_text = "\n    ".join(submission_text)
+            self.progress_display.layout["submitted"].size = len(submission_text) + shell_lines
+            self.progress_display.layout["submitted"].update(Group(out_text, shell_table))
         else:
-            self.progress_display.layout["submitted"].update(submission_text)
-
-        #self.console.log(submission_text)
+            out_text = "\n    ".join(submission_text)
+            self.progress_display.layout["submitted"].size = len(submission_text) + 1
+            self.progress_display.layout["submitted"].update(out_text)
 
     def handle_job_started(self, event_data: events.JobStarted, **kwargs) -> None:
         """Handle job started event."""
@@ -265,7 +260,6 @@ class EventHandler:
                 finished_text += f"\n    [bold green]Wildcards:[/] {wc}"
 
             self.progress_display.layout["finished"].update(finished_text)
-            #self.console.log(finished_text)
 
     def handle_shellcmd(self, event_data: events.ShellCmd, **kwargs) -> None:
         """Handle shell command event with syntax highlighting."""
@@ -453,8 +447,8 @@ class EventHandler:
         for status in self.conda_statuses.values():
             status.stop()
         self.conda_statuses.clear()
-        self.progress_display.progress.stop()
         self.progress_display.live_display.stop()
+        self.progress_display.progress.stop()
 
     def should_log_message(self, record, message):
         """Determine if we should log this message based on content filtering."""
