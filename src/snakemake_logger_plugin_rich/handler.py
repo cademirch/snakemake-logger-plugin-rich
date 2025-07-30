@@ -37,8 +37,8 @@ class RichLogHandler(RichHandler):
         )
         self.layout = Layout()
         self.layout.split_column(
-            Layout(Panel("◯ Last Submitted", box = box.SIMPLE, padding = 0), name = "submitted", size = 15),
-            Layout(Panel("◉ Last Finished", box = box.SIMPLE, padding = 0), name = "finished", size=2),
+            Layout(Panel("◯ Last Submitted", box = box.SIMPLE, padding = 0), name = "submitted", minimum_size =4, size = 15),
+            Layout(Panel("◉ Last Finished", box = box.SIMPLE, padding = 0), name = "finished", size=3),
             Layout(
                 Panel(
                     self.progress,
@@ -46,12 +46,12 @@ class RichLogHandler(RichHandler):
                     border_style="dim",
                     padding = (0,1,0,1)
                 ),
-                name = "progress", size=0, minimum_size=0
+                name = "progress", size=1, minimum_size=1
             )
         )
         self.live_display = Live(
             self.layout,
-            refresh_per_second=4,
+            refresh_per_second=8,
             transient=True,
             console= self.console
         )

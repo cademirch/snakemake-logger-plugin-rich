@@ -123,7 +123,7 @@ class EventHandler:
     ):
         self.current_workflow_id: Optional[UUID] = None
         self.dryrun: bool = dryrun
-        self.print_shellcmd = printshellcmds
+        self.printshellcmds = printshellcmds
         self.show_failed_logs = show_failed_logs
         self.console = console
         self.progress = progress
@@ -205,7 +205,7 @@ class EventHandler:
             submission_text.append(
                 f"[light_steel_blue]Message:[/] {event_data.rule_msg}"
             )
-        if self.print_shellcmd and event_data.shellcmd:
+        if self.printshellcmds and event_data.shellcmd:
             format_cmd = re.sub(r" +", " ", event_data.shellcmd).rstrip()
             format_cmd = re.sub("^\n", "", format_cmd)
             submission_text.append(
@@ -221,13 +221,13 @@ class EventHandler:
                 padding=1
             )
             shell_table.add_row("     ", cmd)
-            shell_lines = format_cmd.count("\n") + 3
+            shell_lines = format_cmd.count("\n") + 5
             out_text = "\n    ".join(submission_text)
             self.progress_display.layout["submitted"].size = len(submission_text) + shell_lines
             self.progress_display.layout["submitted"].update(Group(out_text, shell_table))
         else:
             out_text = "\n    ".join(submission_text)
-            self.progress_display.layout["submitted"].size = len(submission_text) + 1
+            self.progress_display.layout["submitted"].size = len(submission_text) + 2
             self.progress_display.layout["submitted"].update(out_text)
 
     def handle_job_started(self, event_data: events.JobStarted, **kwargs) -> None:
@@ -263,7 +263,9 @@ class EventHandler:
 
     def handle_shellcmd(self, event_data: events.ShellCmd, **kwargs) -> None:
         """Handle shell command event with syntax highlighting."""
-        if not self.print_shellcmd:
+        return
+        #TODO FLAG THIS FOR REMOVAL?
+        if not self.printshellcmds:
             return
         if event_data.shellcmd:
             format_cmd = re.sub(r" +", " ", event_data.shellcmd).rstrip()
