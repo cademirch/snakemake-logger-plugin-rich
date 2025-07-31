@@ -145,7 +145,7 @@ class JobError:
 @dataclass
 class GroupInfo:
     group_id: int
-    jobs: List[Any] = []
+    jobs: List[Any] = field(default_factory=list)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "GroupInfo":
@@ -157,8 +157,8 @@ class GroupInfo:
 @dataclass
 class GroupError:
     groupid: int
-    aux_logs: List[Any] = []
-    job_error_info: Dict[str, Any] = {}
+    aux_logs: List[Any] = field(default_factory=list)
+    job_error_info: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "GroupError":
@@ -225,7 +225,7 @@ class RuleGraph:
 
 @dataclass
 class RunInfo:
-    per_rule_job_counts: Dict[str, int] = {}
+    per_rule_job_counts: Dict[str, int] = field(default_factory=dict)
     total_job_count: int = 0
 
     @classmethod
