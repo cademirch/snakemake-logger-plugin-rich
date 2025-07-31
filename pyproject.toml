@@ -24,6 +24,7 @@ platforms = ["osx-arm64", "linux-64"]
 
 [tool.pixi.environments]
 dev = { features = ["dev"] }
+publish = { features = ["publish"] }
 
 [tool.pixi.pypi-dependencies]
 snakemake-logger-plugin-rich = { path = ".", editable = true }
@@ -50,3 +51,31 @@ conda = ">=25.5.1,<26"
     lint-fix = "ruff check --fix ."
     type-check = "mypy ."
     qc = { depends-on = ["format", "lint", "type-check"] }
+    test = "pytest tests/ -v"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --tb=short"
+testpaths = [
+    "tests",
+]
+python_files = [
+    "test_*.py",
+]
+python_classes = [
+    "Test*",
+]
+python_functions = [
+    "test_*",
+]
+
+# Publish
+[tool.pixi.feature.publish.dependencies]
+twine = ">=6.1.0,<7"
+python-build = ">=1.2.2,<2"
+
+[tool.pixi.feature.publish.tasks]
+build = { cmd = "python -m build", description = "Build the package into the dist/ directory" }
+check-build = { cmd = "python -m twine check dist/*", depends-on = [
+  "build",
+], description = "Check that the package can be uploaded" }

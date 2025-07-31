@@ -3,10 +3,14 @@ name: release-please
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   release-please:
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -21,21 +25,17 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-      
-      - name: "Set up Python"
-        uses: actions/setup-python@v5
+      - name: Install Pixi
+        uses: prefix-dev/setup-pixi@v0.8.14
         with:
-          python-version-file: "pyproject.toml"
+          environments: publish
+          pixi-version: v0.49.0
 
-      - name: Install the project
-        run: uv sync --all-extras --dev
-
-      - name: Build source and wheel distribution
-        run: uv build
+      - name: Build source and wheel distribution + check build
+        run: |
+          pixi run --environment publish check-build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

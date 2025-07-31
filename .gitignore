@@ -5,7 +5,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+pixi.lock
 # C extensions
 *.so
 demo/output

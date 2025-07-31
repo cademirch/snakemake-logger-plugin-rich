@@ -53,16 +53,16 @@ class JobInfo:
     jobid: int
     rule_name: str
     threads: int
-    input: List[str] = []
-    output: List[str] = []
-    log: List[str] = []
-    benchmark: List[str] = []
+    input: List[str] = field(default_factory=list)
+    output: List[str] = field(default_factory=list)
+    log: List[str] = field(default_factory=list)
+    benchmark: List[str] = field(default_factory=list)
     rule_msg: Optional[str] = None
-    wildcards: Dict[str, Any] = {}
+    wildcards: Dict[str, Any] = field(default_factory=dict)
     reason: Optional[str] = None
     shellcmd: Optional[str] = None
     priority: Optional[int] = None
-    resources: Dict[str, Any] = {}
+    resources: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobInfo":
@@ -93,7 +93,7 @@ class JobInfo:
 
 @dataclass
 class JobStarted:
-    job_ids: List[int] = []
+    job_ids: List[int] = field(default_factory=list)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobStarted":
@@ -145,7 +145,7 @@ class JobError:
 @dataclass
 class GroupInfo:
     group_id: int
-    jobs: List[Any] = []
+    jobs: List[Any] = field(default_factory=list)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "GroupInfo":
@@ -157,8 +157,8 @@ class GroupInfo:
 @dataclass
 class GroupError:
     groupid: int
-    aux_logs: List[Any] = []
-    job_error_info: Dict[str, Any] = {}
+    aux_logs: List[Any] = field(default_factory=list)
+    job_error_info: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "GroupError":
@@ -171,9 +171,9 @@ class GroupError:
 
 @dataclass
 class ResourcesInfo:
-    nodes: List[str] = []
+    nodes: List[str] = field(default_factory=list)
     cores: Optional[int] = None
-    provided_resources: Dict[str, Any] = {}
+    provided_resources: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "ResourcesInfo":
@@ -216,7 +216,7 @@ class Progress:
 
 @dataclass
 class RuleGraph:
-    rulegraph: Dict[str, Any] = {}
+    rulegraph: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "RuleGraph":
@@ -225,7 +225,7 @@ class RuleGraph:
 
 @dataclass
 class RunInfo:
-    per_rule_job_counts: Dict[str, int] = {}
+    per_rule_job_counts: Dict[str, int] = field(default_factory=dict)
     total_job_count: int = 0
 
     @classmethod

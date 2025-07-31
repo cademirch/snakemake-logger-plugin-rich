@@ -19,6 +19,7 @@ import snakemake_logger_plugin_rich.events as events
 import re
 import logging
 
+
 def get_time():
     _time = datetime.now()
     return f"{_time.date()} {_time.hour}:{_time.minute}:{_time.second}"
@@ -30,18 +31,19 @@ def formatted_table(cols: int, left_col_style: str):
         show_header=False,
         pad_edge=False,
         show_edge=False,
-        padding=(0,0),
+        padding=(0, 0),
         box=box.SIMPLE,
     )
     # the column name is irrelevant b/c headers won't be shown
     _table.add_column("detail", justify="left", style=left_col_style, no_wrap=True)
-    for i in range(cols-1):
+    for i in range(cols - 1):
         _table.add_column(f"col_{i}", justify="left")
     return _table
 
+
 def prettyprint_rule(rule: str) -> str:
     """Format the rule name to replace underscores with spaces and strip extra spaces"""
-    return re.sub(" +", " ", rule.replace('_', ' ')).strip()
+    return re.sub(" +", " ", rule.replace("_", " ")).strip()
 
 
 def format_wildcards(wildcards):
@@ -50,14 +52,15 @@ def format_wildcards(wildcards):
         return None
 
     wc_text = []
-    for wc,v in wildcards.items():
+    for wc, v in wildcards.items():
         wc_text.append(f"{wc}=[cyan]{v}[/]")
     return ", ".join(wc_text)
 
 
 class ProgressDisplay:
-    def __init__(self, progress: Progress, layout: Layout, live: Live, console: Console):
-
+    def __init__(
+        self, progress: Progress, layout: Layout, live: Live, console: Console
+    ):
         self.progress = progress
         self.layout = layout
         self.live_display = live
@@ -80,8 +83,7 @@ class ProgressDisplay:
 
         if completed >= total:
             self.progress.update(
-                task_id,
-                description=f"[dim green]✓[/] [dim default]{_rule}[/]"
+                task_id, description=f"[dim green]✓[/] [dim default]{_rule}[/]"
             )
 
         return task_id
@@ -100,7 +102,6 @@ class ProgressDisplay:
         if rule in self.rule_tasks:
             task_id = self.rule_tasks[rule]
             self.progress.update(task_id, visible=visible)
-
 
     def has_tasks(self) -> bool:
         """Check if there are any active tasks."""
@@ -123,7 +124,7 @@ class EventHandler:
         live_display: Live,
         dryrun: bool = False,
         printshellcmds: bool = False,
-        show_failed_logs: bool = False
+        show_failed_logs: bool = False,
     ):
         self.current_workflow_id: Optional[UUID] = None
         self.dryrun: bool = dryrun
@@ -131,7 +132,9 @@ class EventHandler:
         self.show_failed_logs = show_failed_logs
         self.console = console
         self.progress = progress
-        self.progress_display = ProgressDisplay(progress, layout, live_display, self.console)
+        self.progress_display = ProgressDisplay(
+            progress, layout, live_display, self.console
+        )
 
         self.jobs_info: dict[int, events.JobInfo] = {}
 
@@ -182,7 +185,6 @@ class EventHandler:
         else:
             self.handle_generic_record(record, **kwargs)
 
-
     def handle_error(self, event_data: events.Error, **kwargs) -> None:
         """Handle error event."""
         pass
@@ -191,7 +193,7 @@ class EventHandler:
         self, event_data: events.WorkflowStarted, **kwargs
     ) -> None:
         """Handle workflow started event."""
-        self.console.rule(f"Workflow {event_data.workflow_id}", style = "green")
+        self.console.rule(f"Workflow {event_data.workflow_id}", style="green")
 
     def handle_job_info(self, event_data: events.JobInfo, **kwargs) -> None:
         """Handle job info event with rich formatting."""
@@ -204,9 +206,7 @@ class EventHandler:
         )
         wc = format_wildcards(event_data.wildcards)
         if wc:
-            submission_text.append(
-                f"[light_steel_blue]Wildcards:[/] {wc}"
-            )
+            submission_text.append(f"[light_steel_blue]Wildcards:[/] {wc}")
         if event_data.rule_msg:
             submission_text.append(
                 f"[light_steel_blue]Message:[/] {event_data.rule_msg}"
@@ -214,9 +214,7 @@ class EventHandler:
         if self.printshellcmds and event_data.shellcmd:
             format_cmd = re.sub(r" +", " ", event_data.shellcmd).rstrip()
             format_cmd = re.sub("^\n", "", format_cmd)
-            submission_text.append(
-                "[light_steel_blue]Shell Command:[/]"
-            )
+            submission_text.append("[light_steel_blue]Shell Command:[/]")
             shell_table = formatted_table(2, "default")
             cmd = Syntax(
                 format_cmd,
@@ -224,13 +222,17 @@ class EventHandler:
                 lexer="bash",
                 tab_size=2,
                 word_wrap=True,
-                padding=1
+                padding=1,
             )
             shell_table.add_row("     ", cmd)
             shell_lines = format_cmd.count("\n") + 5
             out_text = "\n    ".join(submission_text)
-            self.progress_display.layout["submitted"].size = len(submission_text) + shell_lines
-            self.progress_display.layout["submitted"].update(Group(out_text, shell_table))
+            self.progress_display.layout["submitted"].size = (
+                len(submission_text) + shell_lines
+            )
+            self.progress_display.layout["submitted"].update(
+                Group(out_text, shell_table)
+            )
         else:
             out_text = "\n    ".join(submission_text)
             self.progress_display.layout["submitted"].size = len(submission_text) + 2
@@ -260,7 +262,11 @@ class EventHandler:
                 "Total Progress", self.completed, self.total_jobs
             )
 
-            finished_text = "[bold green]◉ Last Finished[/] " + rule_name + f" [dim](id: {job_id})[/] [dim green]{get_time()}[/]"
+            finished_text = (
+                "[bold green]◉ Last Finished[/] "
+                + rule_name
+                + f" [dim](id: {job_id})[/] [dim green]{get_time()}[/]"
+            )
             wc = format_wildcards(info.wildcards)
             if wc:
                 finished_text += f"\n    [bold green]Wildcards:[/] {wc}"
@@ -270,7 +276,7 @@ class EventHandler:
     def handle_shellcmd(self, event_data: events.ShellCmd, **kwargs) -> None:
         """Handle shell command event with syntax highlighting."""
         return
-        #TODO FLAG THIS FOR REMOVAL?
+        # TODO FLAG THIS FOR REMOVAL?
         if not self.printshellcmds:
             return
         if event_data.shellcmd:
@@ -283,7 +289,7 @@ class EventHandler:
                 lexer="bash",
                 tab_size=2,
                 word_wrap=True,
-                padding=1
+                padding=1,
             )
             shell_table.add_row("     ", cmd)
             self.console.log("[light_steel_blue]    Shell Command:[/]", shell_table)
@@ -295,19 +301,20 @@ class EventHandler:
             info = self.jobs_info[job_id]
             rule_name = info.rule_name
             wc = format_wildcards(info.wildcards)
-            failed_text = f"[bold yellow]✗ Failed[/] {rule_name} [dim yellow](id: {job_id})[/]"
+            failed_text = (
+                f"[bold yellow]✗ Failed[/] {rule_name} [dim yellow](id: {job_id})[/]"
+            )
             if wc:
                 failed_text += f"\n    [bold yellow]Wildcards:[/] {wc}"
             self.console.log(failed_text)
-            #TODO Not working like it's supposed to
+            # TODO Not working like it's supposed to
             # self.console.log(info.log)
-            #if self.show_failed_logs:
+            # if self.show_failed_logs:
             for _log in info.log:
-                self.console.rule(f"[bold]Log file: {_log}", style = "yellow")
+                self.console.rule(f"[bold]Log file: {_log}", style="yellow")
                 self.console.print(Path(_log).read_text(), highlight=False)
         else:
             self.console.log(f"[bold yellow]✗ Failed job_id: {job_id})[/]")
-
 
     def handle_group_info(self, event_data: events.GroupInfo, **kwargs) -> None:
         """Handle group info event."""
@@ -345,7 +352,7 @@ class EventHandler:
             self.total_progress_task = self.progress_display.add_or_update(
                 "Total Progress", 0, self.total_jobs
             )
-            #self.console.log(f"Processing Workflow: {self.total_jobs} jobs", style="blue")
+            # self.console.log(f"Processing Workflow: {self.total_jobs} jobs", style="blue")
             self.progress.disable = False
             # end any existing conda statuses
             for status in self.conda_statuses.values():
@@ -374,9 +381,11 @@ class EventHandler:
         if conda_depwarn:
             self.console.print(
                 Panel(
-                    Markdown("Adding `defaults` to the conda channel list implicitly is deprecated. To fix this, read [this guide](https://conda-forge.org/docs/user/tipsandtricks.html)."),
-                    title = "Warning: conda channel configuration",
-                    border_style="yellow"
+                    Markdown(
+                        "Adding `defaults` to the conda channel list implicitly is deprecated. To fix this, read [this guide](https://conda-forge.org/docs/user/tipsandtricks.html)."
+                    ),
+                    title="Warning: conda channel configuration",
+                    border_style="yellow",
                 )
             )
             return
@@ -403,7 +412,9 @@ class EventHandler:
 
         if "Complete log" in message:
             self.console.rule("Workflow Finished", style="green")
-            self.console.print("Complete Log:", message.split(":")[-1].strip(), soft_wrap=True)
+            self.console.print(
+                "Complete Log:", message.split(":")[-1].strip(), soft_wrap=True
+            )
             return
 
         build_dag_match = re.search("^Building DAG of jobs", message)
@@ -475,7 +486,7 @@ class EventHandler:
             "^Provided cores:",
             "^Rules claiming more threads will be",
             r"^Execute \d+ jobs.",
-            #"^Building DAG of jobs.",
+            # "^Building DAG of jobs.",
             "^Activating conda env",
         ]
 
