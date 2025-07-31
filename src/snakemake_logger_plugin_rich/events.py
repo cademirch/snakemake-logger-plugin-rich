@@ -64,7 +64,6 @@ class JobInfo:
     priority: Optional[int] = None
     resources: Dict[str, Any] = field(default_factory=dict)
 
-
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobInfo":
         resources = {}
@@ -94,9 +93,7 @@ class JobInfo:
 
 @dataclass
 class JobStarted:
-
     job_ids: List[int] = field(default_factory=list)
-
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobStarted":
@@ -220,7 +217,6 @@ class Progress:
 @dataclass
 class RuleGraph:
     rulegraph: Dict[str, Any] = field(default_factory=dict)
-
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "RuleGraph":

@@ -5,7 +5,7 @@ from snakemake_logger_plugin_rich.handler import (
 from rich.console import Console
 
 
-class LogHandler(LogHandlerBase, RichLogHandler):
+class LogHandler(LogHandlerBase, RichLogHandler):  # type: ignore
     def __post_init__(self) -> None:
         """
         Any additional setup after initialization.

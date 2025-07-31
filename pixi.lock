@@ -2615,7 +2615,7 @@ packages:
 - pypi: .
   name: snakemake-logger-plugin-rich
   version: 0.3.0
-  sha256: 3e85012ddffc0997bb0dd097a3fdcfbc90d8addd691ed379a04617d765bd2e8b
+  sha256: ace83a0a1e7bcf31da80cc527c512794373584dbb90ea9bbd5ffcb8e67f00da3
   requires_dist:
   - pydantic>=2.10.6
   - rich>=13.9.4

@@ -26,7 +26,9 @@ class RichLogHandler(RichHandler):
         self.console = Console(log_path=False, stderr=True)
         self.progress = Progress(
             TextColumn("[bold blue]{task.description}"),
-            BarColumn(bar_width=None, complete_style="green", finished_style= "dim green"),
+            BarColumn(
+                bar_width=None, complete_style="green", finished_style="dim green"
+            ),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn(),
             console=self.console,
@@ -37,23 +39,31 @@ class RichLogHandler(RichHandler):
         )
         self.layout = Layout()
         self.layout.split_column(
-            Layout(Panel("◯ Last Submitted", box = box.SIMPLE, padding = 0), name = "submitted", minimum_size =4, size = 15),
-            Layout(Panel("◉ Last Finished", box = box.SIMPLE, padding = 0), name = "finished", size=3),
+            Layout(
+                Panel("◯ Last Submitted", box=box.SIMPLE, padding=0),
+                name="submitted",
+                minimum_size=4,
+                size=15,
+            ),
+            Layout(
+                Panel("◉ Last Finished", box=box.SIMPLE, padding=0),
+                name="finished",
+                size=3,
+            ),
             Layout(
                 Panel(
                     self.progress,
-                    title = "Workflow Progress",
+                    title="Workflow Progress",
                     border_style="dim",
-                    padding = (0,1,0,1)
+                    padding=(0, 1, 0, 1),
                 ),
-                name = "progress", size=1, minimum_size=1
-            )
+                name="progress",
+                size=1,
+                minimum_size=1,
+            ),
         )
         self.live_display = Live(
-            self.layout,
-            refresh_per_second=8,
-            transient=True,
-            console= self.console
+            self.layout, refresh_per_second=8, transient=True, console=self.console
         )
 
         self.event_handler = EventHandler(
@@ -63,7 +73,7 @@ class RichLogHandler(RichHandler):
             live_display=self.live_display,
             dryrun=self.settings.dryrun,
             printshellcmds=self.settings.printshellcmds,
-            show_failed_logs=settings.show_failed_logs
+            show_failed_logs=settings.show_failed_logs,
         )
 
         kwargs["console"] = self.console
