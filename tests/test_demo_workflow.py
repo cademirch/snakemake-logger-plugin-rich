@@ -34,6 +34,7 @@ def test_demo_workflow():
             "rich",
             "--cores",
             "1",
+            "output1.1.txt",
         ]
 
         try:
