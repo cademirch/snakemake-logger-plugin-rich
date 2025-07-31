@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.2.3...v0.3.0) (2025-07-31)
+
+
+### Features
+
+* Refactor eventhandler ([#13](https://github.com/cademirch/snakemake-logger-plugin-rich/issues/13)) ([b0f2188](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/b0f2188e8146ccc176f110298458c3f26f57dc96))
+
+
+### Bug Fixes
+
+* migrate to pixi, add demo ([159d012](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/159d0126cddaa088508f8054efcc3d3bad83ff40))
+
 ## [0.2.3](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.2.2...v0.2.3) (2025-03-10)
 
 
