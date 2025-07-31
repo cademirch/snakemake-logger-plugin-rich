@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.1](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.3.0...v0.3.1) (2025-07-31)
+
+
+### Bug Fixes
+
+* add tests ([#15](https://github.com/cademirch/snakemake-logger-plugin-rich/issues/15)) ([e76c9a4](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/e76c9a4291be40f7998e8e2ef727a4d1094af8e8))
+* clean up readme; fix typing  ([#14](https://github.com/cademirch/snakemake-logger-plugin-rich/issues/14)) ([04e113f](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/04e113f287a09475a0eb290a92589102620c7b09))
+
+
+### Miscellaneous Chores
+
+* release 0.3.1 ([667d4a9](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/667d4a9d8fe286b21d3591b729befda1b7b7519b))
+
 ## [0.3.0](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.2.3...v0.3.0) (2025-07-31)
 
 
