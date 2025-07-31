@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3.5", "snakemake>=9.0.1", "ruff>=0.9.10", ]
+dev = ["pytest>=8.3.5", "snakemake>=9.0.1", "ruff>=0.9.10", "mypy>=1.0.0"]
 
 [build-system]
 requires = ["hatchling"]
@@ -45,3 +45,8 @@ conda = ">=25.5.1,<26"
 
 [tool.pixi.feature.dev.tasks]
     demo = { depends-on = ["run-demo", "clean-demo"] }
+    format = "ruff format ."
+    lint = "ruff check ."
+    lint-fix = "ruff check --fix ."
+    type-check = "mypy ."
+    qc = { depends-on = ["format", "lint", "type-check"] }

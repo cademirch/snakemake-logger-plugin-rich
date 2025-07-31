@@ -1,6 +1,6 @@
 from logging import LogRecord
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any, Type, Callable, Protocol
 from uuid import UUID
 from rich.console import Console
 from rich.syntax import Syntax
@@ -13,7 +13,6 @@ from rich.status import Status
 from rich.panel import Panel
 from rich.table import Table
 from rich.console import Group
-from typing import Dict
 from pathlib import Path
 from snakemake_interface_logger_plugins.common import LogEvent
 import snakemake_logger_plugin_rich.events as events
@@ -62,14 +61,14 @@ class ProgressDisplay:
         self.progress = progress
         self.layout = layout
         self.live_display = live
-        self.rule_tasks: Dict[str, TaskID] = {}
+        self.rule_tasks: dict[str, TaskID] = {}
 
     def add_or_update(
         self, rule: str, completed: int, total: int, visible: bool = True
     ):
         _rule = prettyprint_rule(rule)
         if rule not in self.rule_tasks:
-            self.layout["progress"].size += 1
+            self.layout["progress"].size = (self.layout["progress"].size or 0) + 1
             task_id = self.progress.add_task(
                 description=_rule, total=total, visible=visible
             )
@@ -108,6 +107,11 @@ class ProgressDisplay:
         return len(self.rule_tasks) > 0
 
 
+class EventProtocol(Protocol):
+    @classmethod
+    def from_record(cls, record: LogRecord) -> Any: ...
+
+
 class EventHandler:
     """Base class for processing Snakemake log events."""
 
@@ -128,18 +132,24 @@ class EventHandler:
         self.console = console
         self.progress = progress
         self.progress_display = ProgressDisplay(progress, layout, live_display, self.console)
-        self.jobs_info = {}
-        self.rule_counts = {}  # {rule_name: {"total": n, "completed": m}}
+
+        self.jobs_info: dict[int, events.JobInfo] = {}
+
+        # {rule_name: {"total": n, "completed": m}}
+        self.rule_counts: dict[str, dict[str, int]] = {}
+
         self.total_jobs = 0
         self.completed = 0
-        self.conda_statuses = {}  # {env_path: Status object}
+        self.conda_statuses: dict[str, Status] = {}  # {env_path: Status object}
 
     def handle(self, record: LogRecord, **kwargs) -> None:
         """Process a log record, routing to appropriate handler based on event type."""
         event_type = getattr(record, "event", None)
 
         if event_type:
-            handler_map = {
+            handler_map: dict[
+                LogEvent, tuple[Type[EventProtocol], Callable[[Any], None]]
+            ] = {
                 LogEvent.ERROR: (events.Error, self.handle_error),
                 LogEvent.WORKFLOW_STARTED: (
                     events.WorkflowStarted,
@@ -165,8 +175,8 @@ class EventHandler:
             handler_info = handler_map.get(event_type)
             if handler_info:
                 event_class, handler_method = handler_info
-
-                handler_method(event_class.from_record(record), **kwargs)
+                event_data = event_class.from_record(record)
+                handler_method(event_data, **kwargs)
             else:
                 self.handle_generic_event(event_type, record, **kwargs)
         else:
@@ -185,11 +195,7 @@ class EventHandler:
 
     def handle_job_info(self, event_data: events.JobInfo, **kwargs) -> None:
         """Handle job info event with rich formatting."""
-        self.jobs_info[event_data.jobid] = {
-            "rule": event_data.rule_name,
-            "wildcards": event_data.wildcards,
-            "log": event_data.log
-        }
+        self.jobs_info[event_data.jobid] = event_data
 
         self.progress_display.set_visible(event_data.rule_name, True)
         submission_text = []
@@ -240,7 +246,7 @@ class EventHandler:
 
         if job_id in self.jobs_info:
             info = self.jobs_info[job_id]
-            rule_name = info["rule"]
+            rule_name = info.rule_name
 
             if rule_name in self.rule_counts:
                 self.rule_counts[rule_name]["completed"] += 1
@@ -255,7 +261,7 @@ class EventHandler:
             )
 
             finished_text = "[bold green]◉ Last Finished[/] " + rule_name + f" [dim](id: {job_id})[/] [dim green]{get_time()}[/]"
-            wc = format_wildcards(info["wildcards"])
+            wc = format_wildcards(info.wildcards)
             if wc:
                 finished_text += f"\n    [bold green]Wildcards:[/] {wc}"
 
@@ -287,16 +293,16 @@ class EventHandler:
         job_id = event_data.jobid
         if job_id in self.jobs_info:
             info = self.jobs_info[job_id]
-            rule_name = info["rule"]
-            wc = format_wildcards(info["wildcards"])
+            rule_name = info.rule_name
+            wc = format_wildcards(info.wildcards)
             failed_text = f"[bold yellow]✗ Failed[/] {rule_name} [dim yellow](id: {job_id})[/]"
             if wc:
                 failed_text += f"\n    [bold yellow]Wildcards:[/] {wc}"
             self.console.log(failed_text)
             #TODO Not working like it's supposed to
-            #self.console.log(info["log"])
+            # self.console.log(info.log)
             #if self.show_failed_logs:
-            for _log in info["log"]:
+            for _log in info.log:
                 self.console.rule(f"[bold]Log file: {_log}", style = "yellow")
                 self.console.print(Path(_log).read_text(), highlight=False)
         else:
