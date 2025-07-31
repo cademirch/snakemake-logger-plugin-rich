@@ -1,29 +1,37 @@
 rule all:
     input:
-        "output1.txt",
-        "output2.txt",
+        collect("output{x}.{y}.txt", x = range(5), y = range(5)),
         "combined.txt",
+        #"fail.txt"
 
 
-rule create_file1:
+rule create_file:
     output:
-        "output1.txt",
+        "output{x}.{y}.txt"
+    message:
+        "Test message"
     shell:
-        "echo 'Content from file 1' > {output}"
+        """
+        echo 'Content from file {wildcards.x}.{wildcards.y} and written to be kinda long the quick brown fox jumps over the lazy dog' > {output}
+        sleep 1
+        """
 
-
-rule create_file2:
+rule forced_failure:
     output:
-        "output2.txt",
+        "fail.txt"
+    log:
+        "logs/fail.log"
     shell:
-        "echo 'Content from file 2' > {output}"
-
+        "XXechoXX 'this that' > {output} 2> {log}"
 
 rule combine_files:
     input:
-        "output1.txt",
-        "output2.txt",
+        collect("output{x}.{y}.txt", x = range(5), y = range(5))
     output:
-        "combined.txt",
+        "combined.txt"
+    message:
+        "Test message"
+    conda:
+        "envs/conda.yaml"
     shell:
         "cat {input} > {output}"
