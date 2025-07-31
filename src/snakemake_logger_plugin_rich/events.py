@@ -53,16 +53,16 @@ class JobInfo:
     jobid: int
     rule_name: str
     threads: int
-    input: Optional[List[str]] = None
-    output: Optional[List[str]] = None
-    log: Optional[List[str]] = None
-    benchmark: Optional[List[str]] = None
+    input: List[str] = []
+    output: List[str] = []
+    log: List[str] = []
+    benchmark: List[str] = []
     rule_msg: Optional[str] = None
-    wildcards: Optional[Dict[str, Any]] = field(default_factory=dict)
+    wildcards: Dict[str, Any] = {}
     reason: Optional[str] = None
     shellcmd: Optional[str] = None
     priority: Optional[int] = None
-    resources: Optional[Dict[str, Any]] = field(default_factory=dict)
+    resources: Dict[str, Any] = {}
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobInfo":
@@ -83,17 +83,17 @@ class JobInfo:
             reason=getattr(record, "reason", None),
             shellcmd=getattr(record, "shellcmd", None),
             priority=getattr(record, "priority", None),
-            input=getattr(record, "input", None),
-            log=getattr(record, "log", None),
-            output=getattr(record, "output", None),
-            benchmark=getattr(record, "benchmark", None),
+            input=getattr(record, "input", []),
+            log=getattr(record, "log", []),
+            output=getattr(record, "output", []),
+            benchmark=getattr(record, "benchmark", []),
             resources=resources,
         )
 
 
 @dataclass
 class JobStarted:
-    job_ids: List[int]
+    job_ids: List[int] = []
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobStarted":
@@ -145,7 +145,7 @@ class JobError:
 @dataclass
 class GroupInfo:
     group_id: int
-    jobs: List[Any] = field(default_factory=list)
+    jobs: List[Any] = []
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "GroupInfo":
@@ -157,8 +157,8 @@ class GroupInfo:
 @dataclass
 class GroupError:
     groupid: int
-    aux_logs: List[Any] = field(default_factory=list)
-    job_error_info: Dict[str, Any] = field(default_factory=dict)
+    aux_logs: List[Any] = []
+    job_error_info: Dict[str, Any] = {}
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "GroupError":
@@ -171,18 +171,18 @@ class GroupError:
 
 @dataclass
 class ResourcesInfo:
-    nodes: Optional[List[str]] = None
+    nodes: List[str] = []
     cores: Optional[int] = None
-    provided_resources: Optional[Dict[str, Any]] = None
+    provided_resources: Dict[str, Any] = {}
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "ResourcesInfo":
         if hasattr(record, "nodes"):
-            return cls(nodes=record.nodes)  # type: ignore
+            return cls(nodes=getattr(record, "nodes", []))
         elif hasattr(record, "cores"):
             return cls(cores=record.cores)  # type: ignore
         elif hasattr(record, "provided_resources"):
-            return cls(provided_resources=record.provided_resources)  # type: ignore
+            return cls(provided_resources=getattr(record, "provided_resources", {}))
         else:
             return cls()
 
@@ -216,7 +216,7 @@ class Progress:
 
 @dataclass
 class RuleGraph:
-    rulegraph: Dict[str, Any]
+    rulegraph: Dict[str, Any] = {}
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "RuleGraph":
@@ -225,7 +225,7 @@ class RuleGraph:
 
 @dataclass
 class RunInfo:
-    per_rule_job_counts: Dict[str, int] = field(default_factory=dict)
+    per_rule_job_counts: Dict[str, int] = {}
     total_job_count: int = 0
 
     @classmethod
