@@ -1,6 +1,6 @@
 import logging
 from rich.logging import RichHandler
-from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
+from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, SpinnerColumn
 from rich.console import Console
 from rich.layout import Layout
 from rich.live import Live
@@ -25,6 +25,8 @@ class RichLogHandler(RichHandler):
         self.settings = settings
         self.console = Console(log_path=False, stderr=True)
         self.progress = Progress(
+            SpinnerColumn(spinner_name = "dots12", style = "default", finished_text="[dim green]✓"),
+            TextColumn("{task.fields[active]}", style = "default"),
             TextColumn("[bold blue]{task.description}"),
             BarColumn(bar_width=None, complete_style="green", finished_style= "dim green"),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),

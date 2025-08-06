@@ -67,25 +67,40 @@ class ProgressDisplay:
     def add_or_update(
         self, rule: str, completed: int, total: int, visible: bool = True
     ):
+        """
+        Add a rule to the progressbar if it's not already on there, or update the progress of a rule if it is.
+        Reduces the "active" field by 1.
+        """
         _rule = prettyprint_rule(rule)
         if rule not in self.rule_tasks:
             self.layout["progress"].size += 1
             task_id = self.progress.add_task(
-                description=_rule, total=total, visible=visible
+                description=_rule, total=total, visible=visible, active = 1
             )
             self.rule_tasks[rule] = task_id
         else:
             task_id = self.rule_tasks[rule]
-
-        self.progress.update(task_id, completed=completed, total=total)
+        current_task = self.progress.tasks[task_id]
+        currently_active = current_task.fields.get("active", 0) - 1
+        self.progress.update(task_id, completed=completed, total=total, active = currently_active)
 
         if completed >= total:
             self.progress.update(
                 task_id,
-                description=f"[dim green]✓[/] [dim default]{_rule}[/]"
+                description=f"[dim]{_rule}[/]",
+                active = ""
             )
 
         return task_id
+
+    def update_active(self, rule: str):
+        """Increment the "active" field in a progress bar by 1"""
+        task_id = self.rule_tasks[rule]
+        current_task = self.progress.tasks[task_id]
+        self.progress.update(
+            task_id,
+            active = current_task.fields.get("active", 0) + 1
+        )
 
     def mark_rule_failed(self, rule: str):
         """Update progress bar for a failed rule."""
@@ -232,7 +247,11 @@ class EventHandler:
 
     def handle_job_started(self, event_data: events.JobStarted, **kwargs) -> None:
         """Handle job started event."""
-        pass
+        for job_id in event_data.job_ids:
+            if job_id in self.jobs_info:
+                info = self.jobs_info[job_id]
+                rule_name = info["rule"]
+                self.progress_display.update_active(rule_name)
 
     def handle_job_finished(self, event_data: events.JobFinished, **kwargs) -> None:
         """Handle job finished event with rich formatting."""
@@ -432,16 +451,16 @@ class EventHandler:
         """Complete the conda environment creation status."""
         if env_name in self.conda_statuses:
             status = self.conda_statuses[env_name]
-            self.console.log(
-                f"[green]◉ Created[/] conda environment [cyan]{env_name}[/cyan]"
-            )
+            #self.console.log(
+            #    f"[green]◉ Created[/] conda environment [cyan]{env_name}[/cyan]"
+            #)
             status.stop()
             del self.conda_statuses[env_name]
 
         else:
-            self.console.log(
-                f"[green]◉ Created[/] conda environment [cyan]{env_name}[/cyan]"
-            )
+            #self.console.log(
+            #    f"[green]◉ Created[/] conda environment [cyan]{env_name}[/cyan]"
+            #)
             return
 
     def close(self):

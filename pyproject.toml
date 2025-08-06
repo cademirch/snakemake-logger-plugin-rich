@@ -33,6 +33,11 @@ snakemake-logger-plugin-rich = { path = ".", editable = true }
     cmd = "snakemake -s {{ snakefile }} -d demo/output --sdm conda --show-failed-logs --printshellcmds --logger rich --cores 1"
     args = [{ "arg" = "snakefile", "default" = "demo/Snakefile" }]
 
+[tool.pixi.feature.dev.tasks.run-fail]
+    cmd = "snakemake -s {{ snakefile }} -d demo/output --sdm conda --show-failed-logs --printshellcmds --logger rich --cores 1 --config fail=True"
+    args = [{ "arg" = "snakefile", "default" = "demo/Snakefile" }]
+
+
 [tool.pixi.feature.dev.tasks.dryrun]
     cmd = "snakemake -s {{ snakefile }} -d demo/output --printshellcmds --logger rich -n"
     args = [{ "arg" = "snakefile", "default" = "demo/Snakefile" }]
@@ -45,3 +50,4 @@ conda = ">=25.5.1,<26"
 
 [tool.pixi.feature.dev.tasks]
     demo = { depends-on = ["run-demo", "clean-demo"] }
+    fail = { depends-on = ["run-fail", "clean-demo"] }

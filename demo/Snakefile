@@ -2,7 +2,7 @@ rule all:
     input:
         collect("output{x}.{y}.txt", x = range(5), y = range(5)),
         "combined.txt",
-        #"fail.txt"
+        "fail.txt" if config.get("fail", None) else []
 
 
 rule create_file:
