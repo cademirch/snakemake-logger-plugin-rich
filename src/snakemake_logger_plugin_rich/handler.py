@@ -65,7 +65,8 @@ class RichLogHandler(RichHandler):
             live_display=self.live_display,
             dryrun=self.settings.dryrun,
             printshellcmds=self.settings.printshellcmds,
-            show_failed_logs=settings.show_failed_logs
+            show_failed_logs=settings.show_failed_logs,
+            verbose= self.settings.verbose
         )
 
         kwargs["console"] = self.console
