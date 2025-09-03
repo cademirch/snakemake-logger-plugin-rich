@@ -5,7 +5,6 @@ from uuid import UUID
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.progress import Progress, TaskID
-from rich.layout import Layout
 from rich.live import Live
 from rich import box
 from rich.markdown import Markdown
@@ -57,10 +56,9 @@ def format_wildcards(wildcards):
 
 
 class ProgressDisplay:
-    def __init__(self, progress: Progress, layout: Layout, live: Live, console: Console):
+    def __init__(self, progress: Progress, live: Live, console: Console):
 
         self.progress = progress
-        self.layout = layout
         self.live_display = live
         self.rule_tasks: Dict[str, TaskID] = {}
 
@@ -73,7 +71,6 @@ class ProgressDisplay:
         """
         _rule = prettyprint_rule(rule)
         if rule not in self.rule_tasks:
-            self.layout["progress"].size += 1
             task_id = self.progress.add_task(
                 description=_rule, total=total, visible=visible, active = 1
             )
@@ -130,19 +127,20 @@ class EventHandler:
         self,
         console: Console,
         progress: Progress,
-        layout: Layout,
         live_display: Live,
         dryrun: bool = False,
         printshellcmds: bool = False,
-        show_failed_logs: bool = False
+        show_failed_logs: bool = False,
+        verbose: bool = False
     ):
         self.current_workflow_id: Optional[UUID] = None
         self.dryrun: bool = dryrun
-        self.printshellcmds = printshellcmds
-        self.show_failed_logs = show_failed_logs
+        self.verbose: bool = verbose
+        self.printshellcmds: bool = printshellcmds
+        self.show_failed_logs: bool = show_failed_logs
         self.console = console
         self.progress = progress
-        self.progress_display = ProgressDisplay(progress, layout, live_display, self.console)
+        self.progress_display = ProgressDisplay(progress, live_display, self.console)
         self.jobs_info = {}
         self.rule_counts = {}  # {rule_name: {"total": n, "completed": m}}
         self.total_jobs = 0
