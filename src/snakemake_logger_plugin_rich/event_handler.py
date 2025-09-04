@@ -142,11 +142,11 @@ class EventHandler:
         self.console = console
         self.progress = progress
         self.progress_display = ProgressDisplay(progress, live_display, self.console)
-        self.jobs_info = {}
-        self.rule_counts = {}  # {rule_name: {"total": n, "completed": m}}
+        self.jobs_info: dict = {}
+        self.rule_counts: dict = {}  # {rule_name: {"total": n, "completed": m}}
         self.total_jobs = 0
         self.completed = 0
-        self.conda_statuses = {}  # {env_path: Status object}
+        self.conda_statuses: dict = {}  # {env_path: Status object}
 
     def handle(self, record: LogRecord, **kwargs) -> None:
         """Process a log record, routing to appropriate handler based on event type."""
