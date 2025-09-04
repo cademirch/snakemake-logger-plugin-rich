@@ -23,7 +23,7 @@ class RichLogHandler(RichHandler):
         self.settings = settings
         self.console = Console(log_path=False, stderr=True)
         self.progress = Progress(
-            SpinnerColumn(spinner_name = "dots12", style = "default", finished_text="[dim green]✓"),
+            SpinnerColumn(spinner_name = "dots", style = "default", finished_text="[dim green]✓"),
             TextColumn("{task.fields[active]}", style = "default"),
             TextColumn("[bold blue]{task.description}"),
             BarColumn(bar_width=None, complete_style="green", finished_style= "dim green"),
