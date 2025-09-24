@@ -1,6 +1,12 @@
 import logging
 from rich.logging import RichHandler
-from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, SpinnerColumn
+from rich.progress import (
+    Progress,
+    BarColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    SpinnerColumn,
+)
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
@@ -23,10 +29,14 @@ class RichLogHandler(RichHandler):
         self.settings = settings
         self.console = Console(log_path=False, stderr=True)
         self.progress = Progress(
-            SpinnerColumn(spinner_name = "dots", style = "default", finished_text="[dim green]✓"),
-            TextColumn("{task.fields[active]}", style = "default"),
+            SpinnerColumn(
+                spinner_name="dots", style="default", finished_text="[dim green]✓"
+            ),
+            TextColumn("{task.fields[active]}", style="default"),
             TextColumn("[bold blue]{task.description}"),
-            BarColumn(bar_width=None, complete_style="green", finished_style= "dim green"),
+            BarColumn(
+                bar_width=None, complete_style="green", finished_style="dim green"
+            ),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn(),
             console=self.console,
@@ -39,13 +49,13 @@ class RichLogHandler(RichHandler):
         self.live_display = Live(
             Panel(
                 self.progress,
-                title = "Workflow Progress",
+                title="Workflow Progress",
                 border_style="dim",
-                padding = (0,1,0,1)
+                padding=(0, 1, 0, 1),
             ),
             refresh_per_second=8,
             transient=True,
-            console= self.console
+            console=self.console,
         )
 
         self.event_handler = EventHandler(
@@ -55,7 +65,7 @@ class RichLogHandler(RichHandler):
             dryrun=self.settings.dryrun,
             printshellcmds=self.settings.printshellcmds,
             show_failed_logs=settings.show_failed_logs,
-            verbose= self.settings.verbose
+            verbose=self.settings.verbose,
         )
 
         kwargs["console"] = self.console
