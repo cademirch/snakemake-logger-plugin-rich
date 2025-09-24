@@ -1,10 +1,14 @@
 import logging
 from rich.logging import RichHandler
-from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, SpinnerColumn
+from rich.progress import (
+    Progress,
+    BarColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    SpinnerColumn,
+)
 from rich.console import Console
-from rich.layout import Layout
 from rich.live import Live
-from rich import box
 from rich.panel import Panel
 from snakemake_interface_logger_plugins.settings import OutputSettingsLoggerInterface
 from snakemake_logger_plugin_rich.event_handler import EventHandler
@@ -25,10 +29,14 @@ class RichLogHandler(RichHandler):
         self.settings = settings
         self.console = Console(log_path=False, stderr=True)
         self.progress = Progress(
-            SpinnerColumn(spinner_name = "dots12", style = "default", finished_text="[dim green]✓"),
-            TextColumn("{task.fields[active]}", style = "default"),
+            SpinnerColumn(
+                spinner_name="dots", style="default", finished_text="[dim green]✓"
+            ),
+            TextColumn("{task.fields[active]}", style="default"),
             TextColumn("[bold blue]{task.description}"),
-            BarColumn(bar_width=None, complete_style="green", finished_style= "dim green"),
+            BarColumn(
+                bar_width=None, complete_style="green", finished_style="dim green"
+            ),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn(),
             console=self.console,
@@ -37,35 +45,27 @@ class RichLogHandler(RichHandler):
             auto_refresh=False,
             disable=True,
         )
-        self.layout = Layout()
-        self.layout.split_column(
-            Layout(Panel("◯ Last Submitted", box = box.SIMPLE, padding = 0), name = "submitted", minimum_size =4, size = 15),
-            Layout(Panel("◉ Last Finished", box = box.SIMPLE, padding = 0), name = "finished", size=3),
-            Layout(
-                Panel(
-                    self.progress,
-                    title = "Workflow Progress",
-                    border_style="dim",
-                    padding = (0,1,0,1)
-                ),
-                name = "progress", size=1, minimum_size=1
-            )
-        )
+
         self.live_display = Live(
-            self.layout,
+            Panel(
+                self.progress,
+                title="Workflow Progress",
+                border_style="dim",
+                padding=(0, 1, 0, 1),
+            ),
             refresh_per_second=8,
             transient=True,
-            console= self.console
+            console=self.console,
         )
 
         self.event_handler = EventHandler(
             console=self.console,
             progress=self.progress,
-            layout=self.layout,
             live_display=self.live_display,
             dryrun=self.settings.dryrun,
             printshellcmds=self.settings.printshellcmds,
-            show_failed_logs=settings.show_failed_logs
+            show_failed_logs=settings.show_failed_logs,
+            verbose=self.settings.verbose,
         )
 
         kwargs["console"] = self.console
@@ -97,5 +97,4 @@ class RichLogHandler(RichHandler):
     def close(self):
         """Clean up resources."""
         self.event_handler.close()
-        self.console.clear_live()
         super().close()

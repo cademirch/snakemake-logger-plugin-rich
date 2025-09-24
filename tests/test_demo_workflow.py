@@ -11,10 +11,10 @@ import pytest
 
 
 def test_demo_workflow():
-    """Test that the demo workflow runs successfully with the rich logger."""
+    """Test that a sample workflow runs successfully with the rich logger plugin."""
 
     project_root = Path(__file__).parent.parent
-    demo_snakefile = project_root / "demo" / "Snakefile"
+    test_snakefile = project_root / "tests" / "fixtures" / "Snakefile"
 
     with tempfile.TemporaryDirectory() as temp_dir:
         output_dir = Path(temp_dir) / "demo_output"
@@ -23,18 +23,16 @@ def test_demo_workflow():
         cmd = [
             "snakemake",
             "-s",
-            str(demo_snakefile),
+            str(test_snakefile),
             "-d",
             str(output_dir),
-            "--sdm",
-            "conda",
             "--show-failed-logs",
             "--printshellcmds",
             "--logger",
             "rich",
             "--cores",
             "1",
-            "output1.1.txt",
+            "output.txt",
         ]
 
         try:
@@ -46,7 +44,9 @@ def test_demo_workflow():
             )
 
             assert result.returncode == 0, (
-                f"Snakemake failed with stderr: {result.stderr}"
+                f"Snakemake failed with return code {result.returncode}.\n"
+                f"STDOUT: {result.stdout}\n"
+                f"STDERR: {result.stderr}"
             )
 
         except subprocess.TimeoutExpired:
