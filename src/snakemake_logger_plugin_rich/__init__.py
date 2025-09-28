@@ -15,6 +15,9 @@ class LogHandler(LogHandlerBase, RichLogHandler):  # type: ignore
         )
         RichLogHandler.__init__(self, console=console, settings=self.common_settings)
 
+    def emit(self, record):
+        """Delegate emit to RichLogHandler"""
+        return RichLogHandler.emit(self, record)
     @property
     def writes_to_stream(self) -> bool:
         """
