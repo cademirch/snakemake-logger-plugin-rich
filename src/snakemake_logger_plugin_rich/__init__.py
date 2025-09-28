@@ -18,6 +18,7 @@ class LogHandler(LogHandlerBase, RichLogHandler):  # type: ignore
     def emit(self, record):
         """Delegate emit to RichLogHandler"""
         return RichLogHandler.emit(self, record)
+
     @property
     def writes_to_stream(self) -> bool:
         """
