@@ -20,7 +20,7 @@ import logging
 
 
 def get_time():
-    return _time.strftime('%d %b %Y @ %H:%M')
+    return _time.strftime("%d %b %Y @ %H:%M")
 
 
 def formatted_table(cols: int, left_col_style: str):
