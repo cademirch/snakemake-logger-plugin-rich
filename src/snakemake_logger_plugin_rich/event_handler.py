@@ -1,5 +1,4 @@
 from logging import LogRecord
-from datetime import datetime
 from typing import Optional
 from uuid import UUID
 from rich.console import Console
@@ -11,6 +10,7 @@ from rich.markdown import Markdown
 from rich.status import Status
 from rich.panel import Panel
 from rich.table import Table
+import time as _time
 from typing import Dict
 from pathlib import Path
 from snakemake_interface_logger_plugins.common import LogEvent
@@ -20,8 +20,7 @@ import logging
 
 
 def get_time():
-    _time = datetime.now()
-    return f"{_time.date()} {_time.hour}:{_time.minute}:{_time.second}"
+    return _time.strftime("%d %b %Y @ %H:%M")
 
 
 def formatted_table(cols: int, left_col_style: str):
@@ -196,7 +195,7 @@ class EventHandler:
         self, event_data: events.WorkflowStarted, **kwargs
     ) -> None:
         """Handle workflow started event."""
-        self.console.rule(f"Workflow {event_data.workflow_id}", style="green")
+        self.console.rule(f"Workflow start {get_time()}", style="green")
 
     def handle_job_info(self, event_data: events.JobInfo, **kwargs) -> None:
         """Handle job info event with rich formatting."""
