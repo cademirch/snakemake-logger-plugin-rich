@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.4.0...v0.4.1) (2025-10-01)
+
+
+### Bug Fixes
+
+* add emit impl ([#21](https://github.com/cademirch/snakemake-logger-plugin-rich/issues/21)) ([eb04515](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/eb0451531daf750d28bae6c39895124bf181adcd))
+
 ## [0.4.0](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.3.1...v0.4.0) (2025-09-24)
 
 
