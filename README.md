@@ -75,3 +75,6 @@ To test with a custom Snakefile:
 ```
 pixi run demo path/to/your/Snakefile
 ```
+## License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
