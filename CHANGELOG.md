@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.4.1...v0.4.2) (2026-06-11)
+
+
+### Bug Fixes
+
+* support snakemake checkpoints ([#30](https://github.com/cademirch/snakemake-logger-plugin-rich/issues/30)) ([8a0fe29](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/8a0fe297c87dfc883adf805b3f273ba68db840c0))
+
 ## [0.4.1](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.4.0...v0.4.1) (2025-10-01)
 
 
