@@ -83,7 +83,12 @@ class ProgressDisplay:
         else:
             task_id = self.rule_tasks[rule]
             modifier = -1 if decrement_active else 1
-            currently_active = self.progress.tasks[task_id].fields["active"] + modifier
+            active = self.progress.tasks[task_id].fields["active"]
+            # a finished bar carries a styled string in "active"; if a checkpoint
+            # revived it, fall back to a numeric baseline before adjusting.
+            if not isinstance(active, int):
+                active = 0
+            currently_active = active + modifier
 
         self.progress.update(
             task_id, completed=completed, total=total, active=currently_active
@@ -93,14 +98,47 @@ class ProgressDisplay:
             self.progress.update(
                 task_id, description=f"[dim]{_rule}[/]", active="[dim]-[/]"
             )
+        else:
+            # un-dim a bar that was previously complete but has new work again
+            # (checkpoints can grow a rule's total after it appeared finished).
+            self.progress.update(task_id, description=_rule)
 
         return task_id
 
     def update_active(self, rule: str):
-        """Increment the "active" field in a progress bar by 1"""
+        """Increment the "active" field in a progress bar by 1.
+
+        No-op when the rule has no bar yet, or when its bar has already been
+        marked finished (``active`` then holds a styled string). Both can happen
+        with checkpoints, which re-evaluate the DAG mid-run and may schedule jobs
+        for rules the initial run_info never announced.
+        """
+        if rule not in self.rule_tasks:
+            return
         task_id = self.rule_tasks[rule]
-        current_task = self.progress.tasks[task_id]
-        self.progress.update(task_id, active=current_task.fields["active"] + 1)
+        active = self.progress.tasks[task_id].fields["active"]
+        if not isinstance(active, int):
+            return
+        self.progress.update(task_id, active=active + 1)
+
+    def set_total(self, rule: str, total: int):
+        """Update a bar's total (its denominator) without touching the active
+        count. Used when checkpoints grow the number of jobs for a rule."""
+        if rule in self.rule_tasks:
+            self.progress.update(self.rule_tasks[rule], total=total)
+
+    def reactivate(self, rule: str):
+        """Clear the "finished" styling from a bar so it reads as running again.
+
+        A checkpoint can schedule new jobs for a rule whose bar was already
+        completed (and therefore dimmed, with a non-numeric ``active`` field);
+        restore it so subsequent updates behave normally.
+        """
+        if rule not in self.rule_tasks:
+            return
+        task_id = self.rule_tasks[rule]
+        if not isinstance(self.progress.tasks[task_id].fields["active"], int):
+            self.progress.update(task_id, description=prettyprint_rule(rule), active=0)
 
     def mark_rule_failed(self, rule: str):
         """Update progress bar for a failed rule."""
@@ -205,6 +243,7 @@ class EventHandler:
             "log": event_data.log,
         }
 
+        self._register_started_job(event_data.rule_name)
         self.progress_display.set_visible(event_data.rule_name, True)
         self.progress_display.update_active(event_data.rule_name)
         self.progress_display.update_active("Total Progress")
@@ -328,7 +367,7 @@ class EventHandler:
         """Handle run info event - sets up progress bars."""
         try:
             self.dag_status.stop()
-        except NameError:
+        except AttributeError:
             pass
         self.total_jobs = event_data.total_job_count
 
@@ -346,8 +385,64 @@ class EventHandler:
 
         for rule, count in event_data.per_rule_job_counts.items():
             if count > 0:
-                self.rule_counts[rule] = {"total": count, "completed": 0}
+                self.rule_counts[rule] = {
+                    "total": count,
+                    "completed": 0,
+                    "started": 0,
+                }
                 self.progress_display.add_or_update(rule, 0, count, visible=False)
+
+    def _register_started_job(self, rule_name: str) -> None:
+        """Account for a job that is about to run, registering rules that were
+        not part of the initial run_info event.
+
+        Snakemake checkpoints re-evaluate the DAG while the workflow runs, so
+        jobs can appear for rules (or extra jobs for known rules) that run_info
+        never announced. Track started jobs per rule and grow the per-rule and
+        overall totals as needed, so the progress bars stay consistent instead
+        of raising a KeyError or exceeding 100%.
+        """
+        new_rule = rule_name not in self.rule_counts
+        if new_rule:
+            self.rule_counts[rule_name] = {"total": 0, "completed": 0, "started": 0}
+
+        counts = self.rule_counts[rule_name]
+        counts["started"] += 1
+        if counts["started"] > counts["total"]:
+            self.total_jobs += counts["started"] - counts["total"]
+            counts["total"] = counts["started"]
+
+        if new_rule:
+            # register a (hidden) bar the same way run_info does for known rules
+            self.progress_display.add_or_update(
+                rule_name, counts["completed"], counts["total"], visible=False
+            )
+        else:
+            self.progress_display.reactivate(rule_name)
+            self.progress_display.set_total(rule_name, counts["total"])
+
+        self._ensure_total_progress()
+
+    def _ensure_total_progress(self) -> None:
+        """Make sure the overall progress bar and live display are running.
+
+        A workflow driven entirely by checkpoints can report zero jobs in its
+        initial run_info, in which case ``handle_run_info`` never started the
+        display. Bring it up lazily the first time a job appears, and keep the
+        overall total in sync afterwards.
+        """
+        if "Total Progress" not in self.progress_display.rule_tasks:
+            self.progress.disable = False
+            for status in self.conda_statuses.values():
+                status.stop()
+            self.conda_statuses.clear()
+            self.progress_display.add_or_update(
+                "Total Progress", self.completed, self.total_jobs
+            )
+            self.progress_display.live_display.start()
+        else:
+            self.progress_display.reactivate("Total Progress")
+            self.progress_display.set_total("Total Progress", self.total_jobs)
 
     def handle_generic_event(
         self, event_type: LogEvent, record: LogRecord, **kwargs
@@ -419,7 +514,7 @@ class EventHandler:
         """Start a spinning status for conda environment creation."""
         try:
             self.dag_status.stop()
-        except NameError:
+        except AttributeError:
             pass
         status = Status(
             f"Creating conda environment [cyan]{env_name}[/cyan]...",
