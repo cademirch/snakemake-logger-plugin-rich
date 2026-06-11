@@ -10,6 +10,12 @@ dependencies = [
     "snakemake-interface-executor-plugins>=9.3.2",
     "snakemake-interface-logger-plugins>=1.0.0",
 ]
+[project.urls]
+Homepage = "https://github.com/cademirch/snakemake-logger-plugin-rich/"
+Documentation = "https://github.com/cademirch/snakemake-logger-plugin-rich/blob/main/README.md"
+Repository = "https://github.com/cademirch/snakemake-logger-plugin-rich.git"
+Issues = "https://github.com/cademirch/snakemake-logger-plugin-rich/issues"
+Changelog = "https://github.com/cademirch/snakemake-logger-plugin-rich/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3.5", "snakemake>=9.0.1", "ruff>=0.9.10", "mypy>=1.0.0"]
