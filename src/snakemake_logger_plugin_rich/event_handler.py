@@ -371,6 +371,10 @@ class EventHandler:
             pass
         self.total_jobs = event_data.total_job_count
 
+        self._display_job_summary(
+            event_data.per_rule_job_counts, event_data.total_job_count
+        )
+
         if self.total_jobs > 0:
             self.total_progress_task = self.progress_display.add_or_update(
                 "Total Progress", 0, self.total_jobs
@@ -391,6 +395,37 @@ class EventHandler:
                     "started": 0,
                 }
                 self.progress_display.add_or_update(rule, 0, count, visible=False)
+
+    def _display_job_summary(
+        self, per_rule_job_counts: Dict[str, int], total_job_count: int
+    ) -> None:
+        """Render the per-rule job summary (snakemake's "Job stats" table).
+
+        Printed to the console (not the transient progress display) so it stays
+        visible after the run, giving a persistent record of what was scheduled.
+        Shown for both real and dry runs.
+        """
+        if not per_rule_job_counts:
+            return
+
+        table = Table(
+            title="Job stats",
+            title_style="bold",
+            title_justify="left",
+            box=box.SIMPLE_HEAD,
+            header_style="bold blue",
+            pad_edge=False,
+        )
+        table.add_column("rule", justify="left", style="blue")
+        table.add_column("count", justify="right")
+
+        for rule, count in per_rule_job_counts.items():
+            table.add_row(prettyprint_rule(rule), str(count))
+
+        table.add_section()
+        table.add_row("total", str(total_job_count), style="bold")
+
+        self.console.print(table)
 
     def _register_started_job(self, rule_name: str) -> None:
         """Account for a job that is about to run, registering rules that were
