@@ -243,6 +243,12 @@ class EventHandler:
             "log": event_data.log,
         }
 
+        if self.dryrun:
+            # No job actually runs, so there is no progress to update; just list
+            # what would run and why, mirroring snakemake's dry-run output.
+            self._display_dryrun_job(event_data)
+            return
+
         self._register_started_job(event_data.rule_name)
         self.progress_display.set_visible(event_data.rule_name, True)
         self.progress_display.update_active(event_data.rule_name)
@@ -375,6 +381,12 @@ class EventHandler:
             event_data.per_rule_job_counts, event_data.total_job_count
         )
 
+        if self.dryrun:
+            # Nothing executes in a dry run, so there is no progress to track.
+            # The job summary above and the per-job listing (handle_job_info)
+            # are the whole output; skip starting the live progress display.
+            return
+
         if self.total_jobs > 0:
             self.total_progress_task = self.progress_display.add_or_update(
                 "Total Progress", 0, self.total_jobs
@@ -426,6 +438,25 @@ class EventHandler:
         table.add_row("total", str(total_job_count), style="bold")
 
         self.console.print(table)
+
+    def _display_dryrun_job(self, event_data: events.JobInfo) -> None:
+        """List a single job that would run, with its reason (dry-run mode).
+
+        Uses a "Would run" label mirroring the "Started"/"Finished" prefixes of a
+        real run. No timestamp is shown since nothing actually executes.
+        """
+        lines = [
+            f"[bold light_steel_blue]◌ Would run[/] {event_data.rule_name} "
+            f"[dim](id: {event_data.jobid})[/]"
+        ]
+        if event_data.rule_msg:
+            lines.append(f"[italic]{event_data.rule_msg}[/]")
+        wc = format_wildcards(event_data.wildcards)
+        if wc:
+            lines.append(f"[light_steel_blue]Wildcards:[/] {wc}")
+        if event_data.reason:
+            lines.append(f"[light_steel_blue]Reason:[/] [dim]{event_data.reason}[/]")
+        self.console.print("\n    ".join(lines), end="\n\n")
 
     def _register_started_job(self, rule_name: str) -> None:
         """Account for a job that is about to run, registering rules that were
@@ -522,6 +553,12 @@ class EventHandler:
             env_path = conda_done_match.group(1)
             env_name = Path(env_path).name
             self._complete_conda_status(env_name)
+            return
+
+        if message.startswith("This was a dry-run"):
+            # Closing footer snakemake emits at the end of `-n`; no "Complete
+            # log" line is produced in a dry run, so surface this instead.
+            self.console.print(f"\n[yellow]●[/] {message}")
             return
 
         if message.startswith("Nothing to be done"):
