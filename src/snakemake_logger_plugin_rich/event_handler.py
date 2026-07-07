@@ -489,6 +489,13 @@ class EventHandler:
             self._complete_conda_status(env_name)
             return
 
+        if message.startswith("Nothing to be done"):
+            # Snakemake emits this as a plain info log (no LogEvent) when every
+            # requested file is already present and up to date. Surface it so the
+            # run does not appear to end without explanation.
+            self.console.print(f"[green]✓[/] {message}")
+            return
+
         if "Complete log" in message:
             self.console.rule("Workflow Finished", style="green")
             self.console.print(
