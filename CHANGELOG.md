@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.4.2...v0.5.0) (2026-07-15)
+
+
+### Features
+
+* job summary table, dry-run support, and "nothing to be done" message ([#32](https://github.com/cademirch/snakemake-logger-plugin-rich/issues/32)) ([e824b76](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/e824b768533951b564623022bae8cc3223d3fcea))
+
 ## [0.4.2](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.4.1...v0.4.2) (2026-06-11)
 
 
