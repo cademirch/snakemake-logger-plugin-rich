@@ -348,7 +348,9 @@ class EventHandler:
             # if self.show_failed_logs:
             for _log in info["log"]:
                 self.console.rule(f"[bold]Log file: {_log}", style="yellow")
-                self.console.print(Path(_log).read_text(), highlight=False)
+                self.console.print(
+                    Path(_log).read_text(), highlight=False, markup=False
+                )
         else:
             self.console.log(f"[bold yellow]✗ Failed job_id: {job_id})[/]")
 
