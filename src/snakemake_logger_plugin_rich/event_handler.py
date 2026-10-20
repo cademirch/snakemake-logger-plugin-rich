@@ -1,23 +1,23 @@
+import logging
+import re
+import time as _time
 from logging import LogRecord
-from typing import Optional
+from pathlib import Path
 from uuid import UUID
-from rich.console import Console
-from rich.syntax import Syntax
-from rich.progress import Progress, TaskID
-from rich.live import Live
+
 from rich import box
+from rich.console import Console
+from rich.live import Live
 from rich.markdown import Markdown
-from rich.status import Status
 from rich.panel import Panel
+from rich.progress import Progress, TaskID
+from rich.status import Status
+from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
-import time as _time
-from typing import Dict
-from pathlib import Path
 from snakemake_interface_logger_plugins.common import LogEvent
-import snakemake_logger_plugin_rich.events as events
-import re
-import logging
+
+from snakemake_logger_plugin_rich import events
 
 
 def get_time():
@@ -60,7 +60,7 @@ class ProgressDisplay:
     def __init__(self, progress: Progress, live: Live, console: Console):
         self.progress = progress
         self.live_display = live
-        self.rule_tasks: Dict[str, TaskID] = {}
+        self.rule_tasks: dict[str, TaskID] = {}
 
     def add_or_update(
         self,
@@ -174,7 +174,7 @@ class EventHandler:
         show_failed_logs: bool = False,
         verbose: bool = False,
     ):
-        self.current_workflow_id: Optional[UUID] = None
+        self.current_workflow_id: UUID | None = None
         self.dryrun: bool = dryrun
         self.verbose: bool = verbose
         self.printshellcmds: bool = printshellcmds
@@ -350,27 +350,21 @@ class EventHandler:
 
     def handle_group_info(self, event_data: events.GroupInfo, **kwargs) -> None:
         """Handle group info event."""
-        pass
 
     def handle_group_error(self, event_data: events.GroupError, **kwargs) -> None:
         """Handle group error event."""
-        pass
 
     def handle_resources_info(self, event_data: events.ResourcesInfo, **kwargs) -> None:
         """Handle resources info event."""
-        pass
 
     def handle_debug_dag(self, event_data: events.DebugDag, **kwargs) -> None:
         """Handle debug DAG event."""
-        pass
 
     def handle_progress(self, event_data: events.Progress, **kwargs) -> None:
         """Handle progress event."""
-        pass
 
     def handle_rule_graph(self, event_data: events.RuleGraph, **kwargs) -> None:
         """Handle rule graph event."""
-        pass
 
     def handle_run_info(self, event_data: events.RunInfo, **kwargs) -> None:
         """Handle run info event - sets up progress bars."""
@@ -409,7 +403,7 @@ class EventHandler:
                 self.progress_display.add_or_update(rule, 0, count, visible=False)
 
     def _display_job_summary(
-        self, per_rule_job_counts: Dict[str, int], total_job_count: int
+        self, per_rule_job_counts: dict[str, int], total_job_count: int
     ) -> None:
         """Render the per-rule job summary (snakemake's "Job stats" table).
 
@@ -446,8 +440,10 @@ class EventHandler:
         real run. No timestamp is shown since nothing actually executes.
         """
         lines = [
-            f"[bold light_steel_blue]◌ Would run[/] {event_data.rule_name} "
-            f"[dim](id: {event_data.jobid})[/]"
+            (
+                f"[bold light_steel_blue]◌ Would run[/] {event_data.rule_name} "
+                f"[dim](id: {event_data.jobid})[/]"
+            )
         ]
         if event_data.rule_msg:
             lines.append(f"[italic]{event_data.rule_msg}[/]")
@@ -514,7 +510,6 @@ class EventHandler:
         self, event_type: LogEvent, record: LogRecord, **kwargs
     ) -> None:
         """Handle events that don't have a specific handler defined."""
-        pass
 
     def handle_generic_record(self, record: LogRecord, **kwargs) -> None:
         """Handle log records that don't have an event type."""

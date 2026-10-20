@@ -1,16 +1,18 @@
 import traceback
-from rich.logging import RichHandler
-from rich.progress import (
-    Progress,
-    BarColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    SpinnerColumn,
-)
+
 from rich.console import Console
 from rich.live import Live
+from rich.logging import RichHandler
 from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from snakemake_interface_logger_plugins.settings import OutputSettingsLoggerInterface
+
 from snakemake_logger_plugin_rich.event_handler import EventHandler
 
 
@@ -80,7 +82,7 @@ class RichLogHandler(RichHandler):
         """Process log records and delegate to event handler."""
         try:
             self.event_handler.handle(record)
-        except Exception:
+        except Exception:  # noqa: BLE001
             # prints the traceback and the original message to stderr
             self.handleError(record)
 
@@ -89,6 +91,6 @@ class RichLogHandler(RichHandler):
         # snakemake ignores exceptions raised here, so print them ourselves
         try:
             self.event_handler.close()
-        except Exception:
+        except Exception:  # noqa: BLE001
             traceback.print_exc()
         super().close()

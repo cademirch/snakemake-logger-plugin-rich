@@ -1,8 +1,9 @@
+from rich.console import Console
 from snakemake_interface_logger_plugins.base import LogHandlerBase
+
 from snakemake_logger_plugin_rich.handler import (
     RichLogHandler,
 )
-from rich.console import Console
 
 
 class LogHandler(LogHandlerBase, RichLogHandler):  # type: ignore

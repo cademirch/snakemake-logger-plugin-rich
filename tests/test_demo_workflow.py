@@ -7,6 +7,7 @@ This test runs the demo Snakefile to ensure the rich logger plugin works correct
 import subprocess
 import tempfile
 from pathlib import Path
+
 import pytest
 
 
@@ -38,6 +39,7 @@ def test_demo_workflow():
         try:
             result = subprocess.run(
                 cmd,
+                check=False,
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minute timeout
@@ -83,7 +85,9 @@ def test_dryrun_mode():
         ]
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=300
+            )
             assert result.returncode == 0, (
                 f"Dry-run snakemake failed with return code "
                 f"{result.returncode}.\nSTDOUT: {result.stdout}\n"
@@ -139,7 +143,9 @@ def test_nothing_to_be_done():
 
         try:
             # first run builds all outputs
-            first = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            first = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=300
+            )
             assert first.returncode == 0, (
                 f"Initial snakemake run failed with return code "
                 f"{first.returncode}.\nSTDOUT: {first.stdout}\n"
@@ -147,7 +153,9 @@ def test_nothing_to_be_done():
             )
 
             # second run: everything is up to date
-            second = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            second = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=300
+            )
             assert second.returncode == 0, (
                 f"Up-to-date snakemake run failed with return code "
                 f"{second.returncode}.\nSTDOUT: {second.stdout}\n"
@@ -199,6 +207,7 @@ def test_checkpoint_workflow():
         try:
             result = subprocess.run(
                 cmd,
+                check=False,
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minute timeout
@@ -225,6 +234,7 @@ def test_errors_and_messages_are_printed():
     with tempfile.TemporaryDirectory() as temp_dir:
         result = subprocess.run(
             ["snakemake", "-s", str(snakefile), "-d", temp_dir, "--logger", "rich"],
+            check=False,
             capture_output=True,
             text=True,
             timeout=300,
