@@ -210,10 +210,28 @@ def test_checkpoint_workflow():
                 f"STDERR: {result.stderr}"
             )
 
-            assert "Error in logging handler" not in result.stderr, (
+            assert "--- Logging error ---" not in result.stderr, (
                 "The rich logger raised an error while handling checkpoint "
                 f"events.\nSTDERR: {result.stderr}"
             )
 
         except subprocess.TimeoutExpired:
             pytest.fail("Snakemake command timed out after 5 minutes")
+
+
+def test_errors_and_messages_are_printed():
+    snakefile = Path(__file__).parent / "fixtures" / "Snakefile_error"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        result = subprocess.run(
+            ["snakemake", "-s", str(snakefile), "-d", temp_dir, "--logger", "rich"],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+
+    output = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "Initializing workflow context" in output, output
+    assert "CustomConfigError" in output, output
+    assert "unknown step 'pdf'" in output, output

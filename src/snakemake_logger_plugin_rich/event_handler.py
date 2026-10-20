@@ -10,6 +10,7 @@ from rich.markdown import Markdown
 from rich.status import Status
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 import time as _time
 from typing import Dict
 from pathlib import Path
@@ -226,8 +227,10 @@ class EventHandler:
             self.handle_generic_record(record, **kwargs)
 
     def handle_error(self, event_data: events.Error, **kwargs) -> None:
-        """Handle error event."""
-        pass
+        """Handle error event (e.g. an exception raised while parsing the Snakefile)."""
+        self._stop_dag_status()
+        if event_data.message:
+            self.console.print(Text(event_data.message, style="red"), soft_wrap=True)
 
     def handle_workflow_started(
         self, event_data: events.WorkflowStarted, **kwargs
@@ -371,10 +374,7 @@ class EventHandler:
 
     def handle_run_info(self, event_data: events.RunInfo, **kwargs) -> None:
         """Handle run info event - sets up progress bars."""
-        try:
-            self.dag_status.stop()
-        except AttributeError:
-            pass
+        self._stop_dag_status()
         self.total_jobs = event_data.total_job_count
 
         self._display_job_summary(
@@ -578,6 +578,21 @@ class EventHandler:
         build_dag_match = re.search("^Building DAG of jobs", message)
         if build_dag_match:
             self._start_dag_status()
+            return
+
+        # anything not handled above is printed as is, so that no message is lost
+        style = ""
+        if record.levelno >= logging.ERROR:
+            style = "red"
+        elif record.levelno >= logging.WARNING:
+            style = "yellow"
+        self.console.print(Text(message, style=style), soft_wrap=True)
+
+    def _stop_dag_status(self):
+        """Stop the "Building workflow graph" spinner, if running."""
+        status = getattr(self, "dag_status", None)
+        if status is not None:
+            status.stop()
 
     def _start_dag_status(self):
         """Start a spinning status for conda environment creation."""
@@ -591,10 +606,7 @@ class EventHandler:
 
     def _start_conda_status(self, env_name: str):
         """Start a spinning status for conda environment creation."""
-        try:
-            self.dag_status.stop()
-        except AttributeError:
-            pass
+        self._stop_dag_status()
         status = Status(
             f"Creating conda environment [cyan]{env_name}[/cyan]...",
             console=self.console,
@@ -623,6 +635,7 @@ class EventHandler:
 
     def close(self):
         """Clean up any active statuses."""
+        self._stop_dag_status()
         for status in self.conda_statuses.values():
             status.stop()
         self.conda_statuses.clear()

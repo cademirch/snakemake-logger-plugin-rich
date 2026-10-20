@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class Error:
+    message: Optional[str] = None
     exception: Optional[str] = None
     location: Optional[str] = None
     rule: Optional[str] = None
@@ -18,6 +19,7 @@ class Error:
     @classmethod
     def from_record(cls, record: LogRecord) -> "Error":
         return cls(
+            message=record.getMessage(),
             exception=getattr(record, "exception", None),
             location=getattr(record, "location", None),
             rule=getattr(record, "rule", None),
