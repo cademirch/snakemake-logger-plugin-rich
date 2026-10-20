@@ -55,62 +55,68 @@ def test_demo_workflow():
             pytest.fail("Snakemake command timed out after 5 minutes")
 
 
-def test_dryrun_mode():
-    """Test that a dry run lists the jobs that would run, with their reasons.
+@pytest.mark.parametrize("verbose", [False, True])
+def test_dryrun_mode(verbose):
+    """Test the dry-run output.
 
-    Nothing executes in a dry run, so there are no job-started/-finished events
-    and no progress display. The logger should instead list each scheduled job
-    (rule, wildcards, reason) and print snakemake's dry-run footer.
+    The job stats table is printed once, after the job listing. The listing
+    of each job that would run (with wildcards and reason) is only shown with
+    --verbose.
     """
 
     project_root = Path(__file__).parent.parent
     test_snakefile = project_root / "tests" / "fixtures" / "Snakefile"
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        output_dir = Path(temp_dir) / "demo_output"
-        output_dir.mkdir()
-
         cmd = [
             "snakemake",
             "-n",
             "-s",
             str(test_snakefile),
             "-d",
-            str(output_dir),
+            temp_dir,
             "--logger",
             "rich",
             "--cores",
             "1",
             "output.txt",
         ]
+        if verbose:
+            cmd.append("--verbose")
 
-        try:
-            result = subprocess.run(
-                cmd, check=False, capture_output=True, text=True, timeout=300
-            )
-            assert result.returncode == 0, (
-                f"Dry-run snakemake failed with return code "
-                f"{result.returncode}.\nSTDOUT: {result.stdout}\n"
-                f"STDERR: {result.stderr}"
-            )
+        result = subprocess.run(
+            cmd, check=False, capture_output=True, text=True, timeout=300
+        )
 
-            output = result.stdout + result.stderr
-            # per-job listing with reasons, and the dry-run footer
-            assert "Reason:" in output, (
-                "The rich logger did not list job reasons in dry-run mode.\n"
-                f"STDOUT: {result.stdout}\nSTDERR: {result.stderr}"
-            )
-            assert "This was a dry-run" in output, (
-                "The rich logger did not print the dry-run footer.\n"
-                f"STDOUT: {result.stdout}\nSTDERR: {result.stderr}"
-            )
-            assert "create_input" in output, (
-                "The rich logger did not list the scheduled jobs in dry-run "
-                f"mode.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
-            )
+    output = result.stdout + result.stderr
+    assert result.returncode == 0, output
+    assert "This was a dry-run" in output, output
+    assert output.count("Job stats") == 1, output
+    if verbose:
+        assert "Reason:" in output, output
+        assert output.index("Job stats") > output.rindex("Would run"), output
+    else:
+        assert "Would run" not in output, output
 
-        except subprocess.TimeoutExpired:
-            pytest.fail("Snakemake command timed out after 5 minutes")
+
+def test_dryrun_quiet():
+    """With --quiet, snakemake sends the job stats only once."""
+
+    snakefile = Path(__file__).parent / "fixtures" / "Snakefile"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        result = subprocess.run(
+            ["snakemake", "-n", "--quiet", "-s", str(snakefile), "-d", temp_dir]
+            + ["--logger", "rich", "--cores", "1", "output.txt"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 0, output
+    assert output.count("Job stats") == 1, output
 
 
 def test_nothing_to_be_done():

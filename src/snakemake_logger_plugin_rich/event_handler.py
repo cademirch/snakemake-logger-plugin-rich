@@ -187,6 +187,7 @@ class EventHandler:
         self.total_jobs = 0
         self.completed = 0
         self.conda_statuses: dict = {}  # {env_path: Status object}
+        self.dryrun_job_stats: events.RunInfo | None = None
 
     def handle(self, record: LogRecord, **kwargs) -> None:
         """Process a log record, routing to appropriate handler based on event type."""
@@ -229,6 +230,8 @@ class EventHandler:
     def handle_error(self, event_data: events.Error, **kwargs) -> None:
         """Handle error event (e.g. an exception raised while parsing the Snakefile)."""
         self._stop_dag_status()
+        # keep the error as the last output of a failed dry run
+        self.dryrun_job_stats = None
         if event_data.message:
             self.console.print(Text(event_data.message, style="red"), soft_wrap=True)
 
@@ -247,9 +250,10 @@ class EventHandler:
         }
 
         if self.dryrun:
-            # No job actually runs, so there is no progress to update; just list
-            # what would run and why, mirroring snakemake's dry-run output.
-            self._display_dryrun_job(event_data)
+            # No job actually runs, so there is no progress to update. With
+            # --verbose, list what would run and why.
+            if self.verbose:
+                self._display_dryrun_job(event_data)
             return
 
         self._register_started_job(event_data.rule_name)
@@ -371,15 +375,26 @@ class EventHandler:
         self._stop_dag_status()
         self.total_jobs = event_data.total_job_count
 
+        if self.dryrun:
+            # snakemake sends the job stats before listing the jobs and again at
+            # the end. Print them once, at the end, so they are visible without
+            # scrolling. close() prints them if the run stops after the first
+            # (e.g. with --quiet).
+            if self.dryrun_job_stats is None:
+                self.dryrun_job_stats = event_data
+            else:
+                self.dryrun_job_stats = None
+                self._display_job_summary(
+                    event_data.per_rule_job_counts, event_data.total_job_count
+                )
+            # Nothing executes in a dry run, so there is no progress to track.
+            # The job summary and the per-job listing (handle_job_info)
+            # are the whole output; skip starting the live progress display.
+            return
+
         self._display_job_summary(
             event_data.per_rule_job_counts, event_data.total_job_count
         )
-
-        if self.dryrun:
-            # Nothing executes in a dry run, so there is no progress to track.
-            # The job summary above and the per-job listing (handle_job_info)
-            # are the whole output; skip starting the live progress display.
-            return
 
         if self.total_jobs > 0:
             self.total_progress_task = self.progress_display.add_or_update(
@@ -550,6 +565,12 @@ class EventHandler:
             self._complete_conda_status(env_name)
             return
 
+        if message.startswith("Reasons:") and not self.verbose:
+            # the job listing this line refers to is only shown with --verbose
+            message = message.replace(
+                "\n    (check individual jobs above for details)", ""
+            )
+
         if message.startswith("This was a dry-run"):
             # Closing footer snakemake emits at the end of `-n`; no "Complete
             # log" line is produced in a dry run, so surface this instead.
@@ -631,6 +652,10 @@ class EventHandler:
     def close(self):
         """Clean up any active statuses."""
         self._stop_dag_status()
+        # snakemake calls close() more than once
+        if self.dryrun_job_stats is not None:
+            stats, self.dryrun_job_stats = self.dryrun_job_stats, None
+            self._display_job_summary(stats.per_rule_job_counts, stats.total_job_count)
         for status in self.conda_statuses.values():
             status.stop()
         self.conda_statuses.clear()
