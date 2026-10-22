@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.5.0...v0.5.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* print errors and unhandled log messages ([#35](https://github.com/cademirch/snakemake-logger-plugin-rich/issues/35)) ([57fba3b](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/57fba3bd2dcf32aae3f974bd8937f74113fc7d68))
+* print failed job logs without rich markup ([#34](https://github.com/cademirch/snakemake-logger-plugin-rich/issues/34)) ([c6a73de](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/c6a73dedb524715407b34052c05e28acc22c27e8))
+
 ## [0.5.0](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.4.2...v0.5.0) (2026-07-15)
 
 
