@@ -1,16 +1,18 @@
-import logging
-from rich.logging import RichHandler
-from rich.progress import (
-    Progress,
-    BarColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    SpinnerColumn,
-)
+import traceback
+
 from rich.console import Console
 from rich.live import Live
+from rich.logging import RichHandler
 from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from snakemake_interface_logger_plugins.settings import OutputSettingsLoggerInterface
+
 from snakemake_logger_plugin_rich.event_handler import EventHandler
 
 
@@ -80,21 +82,15 @@ class RichLogHandler(RichHandler):
         """Process log records and delegate to event handler."""
         try:
             self.event_handler.handle(record)
-
-        except Exception as e:
-            self.handleError(
-                logging.LogRecord(
-                    name="RichLogHanlder",
-                    level=logging.ERROR,
-                    pathname="",
-                    lineno=0,
-                    msg=f"Error in logging handler: {str(e)}",
-                    args=(),
-                    exc_info=None,
-                )
-            )
+        except Exception:  # noqa: BLE001
+            # prints the traceback and the original message to stderr
+            self.handleError(record)
 
     def close(self):
         """Clean up resources."""
-        self.event_handler.close()
+        # snakemake ignores exceptions raised here, so print them ourselves
+        try:
+            self.event_handler.close()
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
         super().close()

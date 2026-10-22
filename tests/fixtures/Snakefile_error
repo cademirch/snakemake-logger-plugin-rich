@@ -1,0 +1,10 @@
+from snakemake.logging import logger
+
+logger.info("Initializing workflow context")
+
+
+class CustomConfigError(Exception):
+    pass
+
+
+raise CustomConfigError("unknown step 'pdf'")

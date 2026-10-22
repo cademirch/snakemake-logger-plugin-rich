@@ -1,23 +1,25 @@
 import uuid
 from dataclasses import dataclass, field
 from logging import LogRecord
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # redefine these here until they are in logger interface
 
 
 @dataclass
 class Error:
-    exception: Optional[str] = None
-    location: Optional[str] = None
-    rule: Optional[str] = None
-    traceback: Optional[str] = None
-    file: Optional[str] = None
-    line: Optional[str] = None
+    message: str | None = None
+    exception: str | None = None
+    location: str | None = None
+    rule: str | None = None
+    traceback: str | None = None
+    file: str | None = None
+    line: str | None = None
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "Error":
         return cls(
+            message=record.getMessage(),
             exception=getattr(record, "exception", None),
             location=getattr(record, "location", None),
             rule=getattr(record, "rule", None),
@@ -30,7 +32,7 @@ class Error:
 @dataclass
 class WorkflowStarted:
     workflow_id: uuid.UUID
-    snakefile: Optional[str]
+    snakefile: str | None
 
     def __post_init__(self) -> None:
         if not isinstance(self.snakefile, str):
@@ -43,7 +45,7 @@ class WorkflowStarted:
     @classmethod
     def from_record(cls, record: LogRecord) -> "WorkflowStarted":
         return cls(
-            workflow_id=getattr(record, "workflow_id"),
+            workflow_id=getattr(record, "workflow_id"),  # noqa: B009
             snakefile=getattr(record, "snakefile", None),
         )
 
@@ -53,16 +55,16 @@ class JobInfo:
     jobid: int
     rule_name: str
     threads: int
-    input: List[str] = field(default_factory=list)
-    output: List[str] = field(default_factory=list)
-    log: List[str] = field(default_factory=list)
-    benchmark: List[str] = field(default_factory=list)
-    rule_msg: Optional[str] = None
-    wildcards: Dict[str, Any] = field(default_factory=dict)
-    reason: Optional[str] = None
-    shellcmd: Optional[str] = None
-    priority: Optional[int] = None
-    resources: Dict[str, Any] = field(default_factory=dict)
+    input: list[str] = field(default_factory=list)
+    output: list[str] = field(default_factory=list)
+    log: list[str] = field(default_factory=list)
+    benchmark: list[str] = field(default_factory=list)
+    rule_msg: str | None = None
+    wildcards: dict[str, Any] = field(default_factory=dict)
+    reason: str | None = None
+    shellcmd: str | None = None
+    priority: int | None = None
+    resources: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobInfo":
@@ -93,7 +95,7 @@ class JobInfo:
 
 @dataclass
 class JobStarted:
-    job_ids: List[int] = field(default_factory=list)
+    job_ids: list[int] = field(default_factory=list)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobStarted":
@@ -113,14 +115,14 @@ class JobFinished:
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "JobFinished":
-        return cls(job_id=getattr(record, "job_id"))
+        return cls(job_id=getattr(record, "job_id"))  # noqa: B009
 
 
 @dataclass
 class ShellCmd:
     jobid: int
-    shellcmd: Optional[str] = None
-    rule_name: Optional[str] = None
+    shellcmd: str | None = None
+    rule_name: str | None = None
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "ShellCmd":
@@ -145,7 +147,7 @@ class JobError:
 @dataclass
 class GroupInfo:
     group_id: int
-    jobs: List[Any] = field(default_factory=list)
+    jobs: list[Any] = field(default_factory=list)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "GroupInfo":
@@ -157,8 +159,8 @@ class GroupInfo:
 @dataclass
 class GroupError:
     groupid: int
-    aux_logs: List[Any] = field(default_factory=list)
-    job_error_info: Dict[str, Any] = field(default_factory=dict)
+    aux_logs: list[Any] = field(default_factory=list)
+    job_error_info: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "GroupError":
@@ -171,9 +173,9 @@ class GroupError:
 
 @dataclass
 class ResourcesInfo:
-    nodes: List[str] = field(default_factory=list)
-    cores: Optional[int] = None
-    provided_resources: Dict[str, Any] = field(default_factory=dict)
+    nodes: list[str] = field(default_factory=list)
+    cores: int | None = None
+    provided_resources: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "ResourcesInfo":
@@ -189,10 +191,10 @@ class ResourcesInfo:
 
 @dataclass
 class DebugDag:
-    status: Optional[str] = None
-    job: Optional[Any] = None
-    file: Optional[str] = None
-    exception: Optional[str] = None
+    status: str | None = None
+    job: Any | None = None
+    file: str | None = None
+    exception: str | None = None
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "DebugDag":
@@ -216,7 +218,7 @@ class Progress:
 
 @dataclass
 class RuleGraph:
-    rulegraph: Dict[str, Any] = field(default_factory=dict)
+    rulegraph: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_record(cls, record: LogRecord) -> "RuleGraph":
@@ -225,7 +227,7 @@ class RuleGraph:
 
 @dataclass
 class RunInfo:
-    per_rule_job_counts: Dict[str, int] = field(default_factory=dict)
+    per_rule_job_counts: dict[str, int] = field(default_factory=dict)
     total_job_count: int = 0
 
     @classmethod
