@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  # Manually build and publish the version on the selected ref, e.g. to retry a failed release
+  workflow_dispatch:
 
 jobs:
   release-please:
@@ -22,7 +24,7 @@ jobs:
 
   setup_and_build:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created }}
+    if: ${{ needs.release-please.outputs.release_created || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,8 +47,8 @@ jobs:
           
   pypi_publish:
     name: Upload release to PyPI
-    needs: setup_and_build
-    if: ${{ needs.release-please.outputs.release_created }}
+    needs: [release-please, setup_and_build]
+    if: ${{ needs.release-please.outputs.release_created || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment:
       name: release
