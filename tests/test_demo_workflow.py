@@ -234,12 +234,14 @@ def test_checkpoint_workflow():
             pytest.fail("Snakemake command timed out after 5 minutes")
 
 
-def test_errors_and_messages_are_printed():
+@pytest.mark.parametrize("verbose", [False, True])
+def test_errors_and_messages_are_printed(verbose):
     snakefile = Path(__file__).parent / "fixtures" / "Snakefile_error"
 
     with tempfile.TemporaryDirectory() as temp_dir:
         result = subprocess.run(
-            ["snakemake", "-s", str(snakefile), "-d", temp_dir, "--logger", "rich"],
+            ["snakemake", "-s", str(snakefile), "-d", temp_dir, "--logger", "rich"]
+            + (["--verbose"] if verbose else []),
             check=False,
             capture_output=True,
             text=True,
@@ -251,3 +253,4 @@ def test_errors_and_messages_are_printed():
     assert "Initializing workflow context" in output, output
     assert "CustomConfigError" in output, output
     assert "unknown step 'pdf'" in output, output
+    assert "Internal debug details" not in output, output

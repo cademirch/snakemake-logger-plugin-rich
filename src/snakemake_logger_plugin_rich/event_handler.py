@@ -598,7 +598,10 @@ class EventHandler:
             self._start_dag_status()
             return
 
-        # anything not handled above is printed as is, so that no message is lost
+        # anything else is printed as is, except snakemake's debug messages
+        # (sent with --verbose), which are too many to be useful here
+        if record.levelno < logging.INFO:
+            return
         style = ""
         if record.levelno >= logging.ERROR:
             style = "red"
