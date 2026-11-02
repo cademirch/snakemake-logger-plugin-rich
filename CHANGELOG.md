@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.5.1...v0.5.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* do not print snakemake debug messages ([#37](https://github.com/cademirch/snakemake-logger-plugin-rich/issues/37)) ([da717af](https://github.com/cademirch/snakemake-logger-plugin-rich/commit/da717af238ff2ecc3b79bca7e65337f6cd5edcc7))
+
 ## [0.5.1](https://github.com/cademirch/snakemake-logger-plugin-rich/compare/v0.5.0...v0.5.1) (2026-10-22)
 
 
