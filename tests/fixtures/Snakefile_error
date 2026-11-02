@@ -1,6 +1,7 @@
 from snakemake.logging import logger
 
 logger.info("Initializing workflow context")
+logger.debug("Internal debug details")
 
 
 class CustomConfigError(Exception):
